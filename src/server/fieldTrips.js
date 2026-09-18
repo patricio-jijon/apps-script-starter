@@ -42,11 +42,21 @@ export const getAppData = () => {
     photo: r['Photo / Media'] || '',
     video: r['Video URL'] || '',
   })).filter((r) => r.id && r.title && r.status !== 'Archived');
+  const equipment = getObjects_(ss, 'Equipment').map((r) => ({
+    category: r['Category'] || '',
+    name: r['Equipment / Software'] || '',
+    type: r['Type / Use'] || '',
+    description: r['Public Description'] || '',
+    sourceUrl: r['Source URL'] || '',
+    active: String(r['Active']).toLowerCase() !== 'false',
+  })).filter((r) => r.name && r.active);
+
 
   return {
     schools,
     contacts,
     workshops,
+    equipment,
     availability: getAvailability_(),
     district: {
       name: 'NYC Public Schools District 3',
@@ -294,6 +304,7 @@ export const getStaffAdminData = () => {
   return {
     reservations: getObjects_(ss, 'Reservations'),
     workshops: getObjects_(ss, 'Workshops'),
+    equipment: getObjects_(ss, 'Equipment'),
     availability: getObjects_(ss, 'Availability'),
     contacts: getObjects_(ss, 'Outreach Contacts'),
     campaigns: getObjects_(ss, 'Email Campaigns'),
@@ -317,6 +328,7 @@ export const saveStaffRecord = (sheetName, keyHeader, keyValue, values) => {
     'Media Library': true,
     'Risk Forms': true,
     'Attendance': true,
+    'Equipment': true,
   };
   if (!allowed[sheetName]) throw new Error('This section cannot be edited from the staff interface.');
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
