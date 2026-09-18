@@ -70,7 +70,6 @@ const sections=[
   ['media','Images & Media'],['equipment','Equipment & Machines'],['risk','Assumption of Risk'],['attendance','Attendance'],['settings','Settings']
 ];
 function esc(v){return String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[s]))}
-function initNav(){document.getElementById('nav').innerHTML=sections.map(([id,label],i=>i))}
 function buildNav(){
   document.getElementById('nav').innerHTML=sections.map(([id,label],i)=>'<button class="'+(i===0?'active':'')+'" onclick="showView(\''+id+'\',this)">'+esc(label)+'</button>').join('');
 }
@@ -315,11 +314,11 @@ function reservationActions(r){
   const id=jsq(r['Reservation ID']);
   const status=String(r.Status||'').toUpperCase();
   let out='<div class="toolbar">';
-  if(status!=='CONFIRMED'&&status!=='CANCELLED') out+='<button class="btn primary" onclick="approveReservationUI(\''+id+'\')">Approve</button>';
+  if(['REQUESTED','STAFF REVIEW'].includes(status)) out+='<button class="btn primary" onclick="approveReservationUI(\''+id+'\')">Approve</button>';
   if(['CONFIRMED','RISK FORMS SENT','RISK FORMS COMPLETE','REMINDER SENT'].includes(status)) out+='<button class="btn secondary" onclick="sendReminderUI(\''+id+'\')">Send reminder</button>';
   if(['CONFIRMED','RISK FORMS SENT','RISK FORMS COMPLETE','REMINDER SENT'].includes(status)) out+='<button class="btn secondary" onclick="sendRiskFormUI(\''+id+'\')">Risk form</button>';
-  if(status!=='CANCELLED') out+='<button class="btn secondary" onclick="openAttendanceUI(\''+id+'\')">Attendance</button>';
-  if(status!=='CANCELLED') out+='<button class="btn danger" onclick="cancelReservationUI(\''+id+'\')">Cancel</button>';
+  if(!['CANCELLED'].includes(status)) out+='<button class="btn secondary" onclick="openAttendanceUI(\''+id+'\')">Attendance</button>';
+  if(!['CANCELLED','COMPLETED'].includes(status)) out+='<button class="btn danger" onclick="cancelReservationUI(\''+id+'\')">Cancel</button>';
   out+='</div>';
   return out;
 }
