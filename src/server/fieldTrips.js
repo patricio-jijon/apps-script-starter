@@ -495,6 +495,123 @@ export const markSchoolContacted = (contactEmail, notes) => {
   throw new Error('Contact not found: ' + contactEmail);
 };
 
+export const updateRiskFormStatus = (reservationId, payload) => {
+  verifyStaff_();
+  payload = payload || {};
+  const allowedStatuses = ['NOT SENT','SENT','SIGNED','MISSING','VERIFIED'];
+  const status = String(payload.status || '').toUpperCase();
+  if (!allowedStatuses.includes(status)) throw new Error('Invalid risk-form status.');
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const reservations = getObjects_(ss, 'Reservations');
+  const reservation = reservations.find((r) => String(r['Reservation ID']) === String(reservationId));
+  if (!reservation) throw new Error('Reservation not found: ' + reservationId);
+
+  const riskSheet = ss.getSheetByName('Risk Forms');
+  const data = riskSheet.getDataRange().getValues();
+  const headers = data[0].map((h) => String(h || '').trim());
+  const idIndex = headers.indexOf('Reservation ID');
+  let rowNumber = -1;
+  let existing = {};
+  for (let i = 1; i < data.length; i += 1) {
+    if (String(data[i][idIndex]) === String(reservationId)) {
+      rowNumber = i + 1;
+      headers.forEach((h, j) => { if (h) existing[h] = data[i][j]; });
+      break;
+    }
+  }
+
+  const values = {
+    'Reservation ID': reservationId,
+    'School': String(reservation['School Name'] || ''),
+    'Field Trip Date': normalizeDate_(reservation['Date']),
+    'Participant / Form Reference': String(existing['Participant / Form Reference'] || 'School group'),
+    'Guardian / Signer': String(payload.signerName || existing['Guardian / Signer'] || reservation['Contact Name'] || ''),
+    'Email': String(payload.email || existing['Email'] || reservation['Contact Email'] || ''),
+    'Sent Date': String(payload.sentDate || existing['Sent Date'] || ''),
+    'Signed Date': String(payload.signedDate || existing['Signed Date'] || ''),
+    'Status': status,
+    'Drive File / Folder': String(payload.fileUrl || existing['Drive File / Folder'] || reservation['Risk Form Folder / Link'] || ''),
+    'Staff Verified': status === 'VERIFIED' ? 'YES' : String(payload.staffVerified || existing['Staff Verified'] || 'NO'),
+    'Notes': String(payload.notes || existing['Notes'] || ''),
+  };
+  const row = headers.map((header) =>
+    Object.prototype.hasOwnProperty.call(values, header) ? values[header] : ''
+  );
+  if (rowNumber > 0) riskSheet.getRange(rowNumber, 1, 1, headers.length).setValues([row]);
+  else riskSheet.appendRow(row);
+
+  const reservationSheet = ss.getSheetByName('Reservations');
+  const resData = reservationSheet.getDataRange().getValues();
+  const resHeaders = resData[0].map((h) => String(h || '').trim());
+  const resIdIndex = resHeaders.indexOf('Reservation ID');
+  const riskStatusIndex = resHeaders.indexOf('Risk Form Status');
+  const riskLinkIndex = resHeaders.indexOf('Risk Form Folder / Link');
+  const statusIndex = resHeaders.indexOf('Status');
+  for (let i = 1; i < resData.length; i += 1) {
+    if (String(resData[i][resIdIndex]) !== String(reservationId)) continue;
+    if (riskStatusIndex >= 0) reservationSheet.getRange(i + 1, riskStatusIndex + 1).setValue(status);
+    if (riskLinkIndex >= 0 && values['Drive File / Folder']) reservationSheet.getRange(i + 1, riskLinkIndex + 1).setValue(values['Drive File / Folder']);
+    if (statusIndex >= 0 && status === 'SENT') reservationSheet.getRange(i + 1, statusIndex + 1).setValue('RISK FORMS SENT');
+    if (statusIndex >= 0 && ['SIGNED','VERIFIED'].includes(status)) reservationSheet.getRange(i + 1, statusIndex + 1).setValue('RISK FORMS COMPLETE');
+    break;
+  }
+  return {ok: true, reservationId, status};
+};
+
+export const sendRiskFormLink = (reservationId) => {
+  verifyStaff_();
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const settings = getSettings_();
+  if (String(settings['Enable Email Automations']).toUpperCase() !== 'TRUE') {
+    throw new Error('Email automations are disabled in Settings.');
+  }
+  const riskUrl = String(settings['Risk Form URL'] || '').trim();
+  if (!riskUrl || riskUrl === 'TBD') throw new Error('Add the official Risk Form URL in Settings first.');
+
+  const reservation = getObjects_(ss, 'Reservations')
+    .find((r) => String(r['Reservation ID']) === String(reservationId));
+  if (!reservation) throw new Error('Reservation not found: ' + reservationId);
+
+  const email = String(reservation['Contact Email'] || '').trim();
+  if (!email) throw new Error('This reservation does not have a contact email.');
+  const subject = 'NYC FIRST Assumption of Risk Form — ' + reservationId;
+  const body = [
+    'Please complete the Assumption of Risk form for your NYC FIRST school field trip.',
+    '',
+    'Reservation ID: ' + reservationId,
+    'School: ' + String(reservation['School Name'] || ''),
+    'Field trip date: ' + normalizeDate_(reservation['Date']),
+    'Activity: ' + String(reservation['Workshop Title'] || ''),
+    '',
+    'Assumption of Risk form: ' + riskUrl,
+    '',
+    'NYC FIRST · Washington Heights STEM Center'
+  ].join('\n');
+  MailApp.sendEmail(email, subject, body);
+
+  updateRiskFormStatus(reservationId, {
+    status: 'SENT',
+    sentDate: Utilities.formatDate(new Date(), APP_TIMEZONE, 'yyyy-MM-dd'),
+    fileUrl: riskUrl,
+    signerName: String(reservation['Contact Name'] || ''),
+    email,
+    notes: 'Risk form link sent manually from Staff Admin.',
+  });
+
+  logCommunication_(ss, {
+    schoolId: String(reservation['School ID / DBN'] || ''),
+    school: String(reservation['School Name'] || ''),
+    contactName: String(reservation['Contact Name'] || ''),
+    contactEmail: email,
+    type: 'RISK FORM',
+    subject,
+    reservationId,
+    notes: 'Risk form link sent.',
+  });
+  return {ok: true, reservationId, email};
+};
+
 export const geocodeD3Schools = () => {
   verifyStaff_();
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
