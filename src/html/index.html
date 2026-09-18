@@ -7,12 +7,13 @@
   <title>D3 STEM Field Trips</title>
   <style>
     :root {
-      --ink:#14213d; --muted:#62708a; --paper:#f7f9fc; --card:#ffffff;
-      --accent:#ffb703; --accent2:#219ebc; --deep:#023047; --ok:#2a9d8f;
-      --line:#dbe3ee; --danger:#c44536; --shadow:0 18px 50px rgba(20,33,61,.10);
+      --ink:#010101; --muted:#626262; --paper:#f7f9fc; --card:#ffffff;
+      --accent:#ED1C24; --accent2:#009CD6; --deep:#154593; --blue:#0065B3; --ok:#2a9d8f;
+      --line:#dbe3ee; --danger:#ED1C24; --shadow:0 18px 50px rgba(21,69,147,.10);
     }
     *{box-sizing:border-box}
-    body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--paper);color:var(--ink)}
+    @import url('https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700;800;900&display=swap');
+    body{margin:0;font-family:"Work Sans",Arial,sans-serif;background:var(--paper);color:var(--ink)}
     button,input,select,textarea{font:inherit}
     button{cursor:pointer}
     a{color:inherit}
@@ -31,6 +32,9 @@
     .actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:24px}
     .primary,.secondary{border:0;border-radius:14px;padding:14px 18px;font-weight:900}
     .primary{background:var(--deep);color:white}
+    .sharebtn{border:1px solid var(--line);background:white;border-radius:10px;padding:8px 10px;font-weight:800;color:var(--deep)}
+    .costbox{background:#eef7ff;border:1px solid #c9e5f8;border-left:5px solid var(--accent2);border-radius:16px;padding:16px 18px;margin:12px 0 22px;line-height:1.55}
+    .costbox a{color:var(--blue);font-weight:900}
     .secondary{background:white;color:var(--deep);border:1px solid var(--line)}
     .heroart{background:linear-gradient(145deg,#073b4c,#219ebc);min-height:420px;border-radius:32px;position:relative;overflow:hidden;box-shadow:var(--shadow);padding:28px;color:white}
     .orbit{position:absolute;border:2px solid rgba(255,255,255,.17);border-radius:50%}
@@ -97,7 +101,7 @@
 <body>
   <div class="nav">
     <div class="navin">
-      <div class="brand"><div class="logo">⚙</div><span>D3 STEM Field Trips</span></div>
+      <div class="brand"><div class="logo">NYC</div><span>NYC FIRST · D3 STEM Field Trips</span></div>
       <div class="navlinks">
         <button onclick="go('activities')">Activities</button>
         <button onclick="go('book')">Book</button>
@@ -110,11 +114,11 @@
   <main class="shell">
     <section class="hero">
       <div>
-        <div class="eyebrow">NYC FIRST · Washington Heights STEM Center · DEMO</div>
+        <div class="eyebrow">NYC FIRST · Washington Heights STEM Center</div>
         <h1>Turn a school day into a STEM mission.</h1>
         <p>Explore hands-on field trips in robotics, coding, digital fabrication, environmental engineering, chemistry, sound, and physical computing—then choose an open date in a few clicks.</p>
         <div class="actions">
-          <button class="primary" onclick="go('book')">Reserve a demo field trip</button>
+          <button class="primary" onclick="go('book')">Reserve a field trip</button>
           <button class="secondary" onclick="go('activities')">Explore activities</button>
         </div>
       </div>
@@ -131,14 +135,15 @@
 
     <section id="activities">
       <div class="sectionhead">
-        <div><h2>Choose the mission.</h2><p class="sub">Demo titles for now. Every card can later use your real photos, videos, age bands, and official descriptions.</p></div>
+        <div><h2>Choose a STEM experience.</h2><p class="sub">Explore robotics, coding, engineering, design, digital fabrication, science, and creative technology activities for District 3 schools.</p></div>
       </div>
+      <div class="costbox">Questions about the cost of a school field trip? Contact <b>Katiuska Hernandez</b> at <a href="mailto:kat@nycfirst.org">kat@nycfirst.org</a>.</div>
       <div id="workshopGrid" class="grid"></div>
     </section>
 
     <section id="book">
       <div class="sectionhead">
-        <div><h2>Book a field trip.</h2><p class="sub">Select the school, activity, date, and contact details. The live version writes the reservation to Google Sheets.</p></div>
+        <div><h2>Book a field trip.</h2><p class="sub">Select your school, STEM activity, date, and contact details. Your request will be sent to NYC FIRST staff for review and confirmation.</p></div>
       </div>
       <div class="booking">
         <aside class="stepper">
@@ -186,10 +191,11 @@
             </div>
             <div class="risk">
               <b>Demo assumption-of-risk acknowledgement</b>
-              <p>This is only a placeholder workflow for the prototype. Tomorrow, replace this text with the official NYC FIRST / partner form and required consent language.</p>
+              <p>The official NYC FIRST Assumption of Risk form link will be included in confirmation and reminder communications. The final form URL is still pending and will be controlled from the staff settings.</p>
               <label>Authorized signer name</label><input id="riskSigner">
               <div class="check" style="margin-top:10px"><input id="riskAcknowledged" type="checkbox"><span>I acknowledge that the official assumption-of-risk / consent form will be required before participation.</span></div>
             </div>
+            <div class="costbox">Cost questions: <b>Katiuska Hernandez</b> · <a href="mailto:kat@nycfirst.org">kat@nycfirst.org</a></div>
             <div class="actions"><button class="secondary" onclick="setStep(3)">Back</button><button class="primary" id="submitBtn" onclick="submitBooking()">Submit reservation</button></div>
           </div>
         </div>
@@ -261,6 +267,18 @@
   }
 
   function go(id){ document.getElementById(id).scrollIntoView({behavior:'smooth',block:'start'}); }
+  async function shareWorkshop(id,event){
+    if(event)event.stopPropagation();
+    const w=state.data.workshops.find(x=>x.id===id); if(!w)return;
+    const base=window.location.href.split('#')[0];
+    const url=base+'#activity='+encodeURIComponent(id);
+    const shareData={title:'NYC FIRST — '+w.title,text:w.description,url};
+    try{
+      if(navigator.share){await navigator.share(shareData);}
+      else if(navigator.clipboard){await navigator.clipboard.writeText(url);alert('Activity link copied to clipboard.');}
+      else{prompt('Copy this activity link:',url);}
+    }catch(e){}
+  }
   function esc(v){ return String(v ?? '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[s])); }
 
   function renderWorkshops(){
@@ -268,8 +286,8 @@
     grid.innerHTML = state.data.workshops.map(w => `
       <article class="card workshop">
         <div class="visual">${w.icon}</div>
-        <div class="cardbody"><span class="pill">${esc(w.ages)} · ${esc(w.duration)}</span><h3>${esc(w.title)}</h3><div class="subtitle">${esc(w.subtitle)}</div><p>${esc(w.description)}</p></div>
-        <footer><span class="dbn">Up to ${w.capacity} students</span><button class="linkbtn" onclick="openWorkshop('${w.id}')">See activity →</button></footer>
+        <div class="cardbody"><span class="pill">${esc(w.ages)} · ${esc(w.duration)}</span><h3>${esc(w.title)}</h3><div class="subtitle">${esc(w.category || w.subtitle || 'STEM Activity')}</div><p>${esc(w.description)}</p></div>
+        <footer><span class="dbn">${String(w.capacity).toLowerCase()==='tbd'?'Capacity TBD':'Up to '+esc(w.capacity)+' students'}</span><div style="display:flex;gap:10px;align-items:center"><button class="sharebtn" onclick="shareWorkshop('${w.id}',event)">Share</button><button class="linkbtn" onclick="openWorkshop('${w.id}')">See activity →</button></div></footer>
       </article>`).join('');
     document.getElementById('bookingWorkshops').innerHTML = state.data.workshops.map(w => `
       <button class="choice ${state.workshopId===w.id?'selected':''}" onclick="selectWorkshop('${w.id}')"><span style="font-size:28px">${w.icon}</span><b>${esc(w.title)}</b><small>${esc(w.ages)} · ${esc(w.duration)}</small></button>`).join('');
@@ -281,7 +299,7 @@
     document.getElementById('modalIcon').textContent=w.icon;
     document.getElementById('modalPhoto').textContent=w.icon;
     document.getElementById('modalTitle').textContent=w.title;
-    document.getElementById('modalSubtitle').textContent=w.subtitle+' · '+w.ages+' · '+w.duration;
+    document.getElementById('modalSubtitle').textContent=(w.category || w.subtitle || 'STEM Activity')+' · '+w.ages+' · '+w.duration;
     document.getElementById('modalDescription').textContent=w.description;
     document.getElementById('modalObjectives').innerHTML=w.objectives.map(x=>'<li>'+esc(x)+'</li>').join('');
     document.getElementById('modalStandards').innerHTML=w.standards.map(x=>'<li>'+esc(x)+'</li>').join('');
@@ -351,7 +369,7 @@
     google.script.run.withSuccessHandler(result=>{
       btn.disabled=false;btn.textContent='Submit reservation';
       showNotice('Reservation '+result.reservationId+' saved. Status: '+result.status+'.', 'ok');
-      document.getElementById('bookingSummary').innerHTML=`<b>Reservation received ✓</b><p>ID: ${esc(result.reservationId)}</p><p>${esc(result.school)} · ${esc(result.workshop)} · ${esc(result.date)} · ${esc(result.time)}</p><p>This demo records the request in Google Sheets for staff follow-up.</p>`;
+      document.getElementById('bookingSummary').innerHTML=`<b>Reservation received ✓</b><p>ID: ${esc(result.reservationId)}</p><p>${esc(result.school)} · ${esc(result.workshop)} · ${esc(result.date)} · ${esc(result.time)}</p><p>Your request is recorded for NYC FIRST staff review. Booking notifications are configured for Patricio, Mariana, and Katiuska, and the school confirmation workflow can include the Assumption of Risk link.</p>`;
     }).withFailureHandler(err=>{btn.disabled=false;btn.textContent='Submit reservation';showNotice(err.message||String(err),'error')}).submitReservation(payload);
   }
   function val(id){return document.getElementById(id).value.trim()}
