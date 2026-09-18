@@ -121,7 +121,6 @@ export const submitReservation = (payload) => {
   ]);
 
   markAvailabilityBooked_(availability, payload.date, payload.time, reservationId);
-  maybeCreateCalendarEvent_(payload, reservationId, schoolName, workshopTitle, endTime);
   maybeSendReservationEmails_(payload, reservationId, schoolName, workshopTitle, endTime);
 
   return {
@@ -323,15 +322,17 @@ export const saveStaffRecord = (sheetName, keyHeader, keyValue, values) => {
   if (keyIndex < 0) throw new Error('Key column not found: ' + keyHeader);
 
   let rowNumber = -1;
+  let existingRow = new Array(headers.length).fill('');
   for (let i = 1; i < data.length; i += 1) {
     if (String(data[i][keyIndex]) === String(keyValue)) {
       rowNumber = i + 1;
+      existingRow = data[i].slice();
       break;
     }
   }
 
-  const row = headers.map((header) =>
-    Object.prototype.hasOwnProperty.call(values, header) ? values[header] : ''
+  const row = headers.map((header, i) =>
+    Object.prototype.hasOwnProperty.call(values, header) ? values[header] : existingRow[i]
   );
   row[keyIndex] = keyValue;
 
@@ -342,6 +343,198 @@ export const saveStaffRecord = (sheetName, keyHeader, keyValue, values) => {
   }
   return {ok: true, sheetName, keyValue};
 };
+
+export const saveSetting = (settingName, value, notes) => {
+  verifyStaff_();
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName('Settings');
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i += 1) {
+    if (String(data[i][0]) === String(settingName)) {
+      sheet.getRange(i + 1, 2).setValue(value);
+      if (notes !== undefined) sheet.getRange(i + 1, 3).setValue(notes || '');
+      return {ok: true, setting: settingName, value};
+    }
+  }
+  sheet.appendRow([settingName, value, notes || '']);
+  return {ok: true, setting: settingName, value};
+};
+
+export const approveReservation = (reservationId) => {
+  verifyStaff_();
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName('Reservations');
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0].map((h) => String(h || '').trim());
+  const idCol = headers.indexOf('Reservation ID');
+  if (idCol < 0) throw new Error('Reservation ID column is missing.');
+
+  let rowNumber = -1;
+  let row = null;
+  for (let i = 1; i < data.length; i += 1) {
+    if (String(data[i][idCol]) === String(reservationId)) {
+      rowNumber = i + 1;
+      row = data[i];
+      break;
+    }
+  }
+  if (!row) throw new Error('Reservation not found: ' + reservationId);
+
+  const get = (name) => row[headers.indexOf(name)];
+  const statusCol = headers.indexOf('Status') + 1;
+  const approvalCol = headers.indexOf('Staff Approval') + 1;
+  const confirmationCol = headers.indexOf('Confirmation Sent') + 1;
+
+  sheet.getRange(rowNumber, statusCol).setValue('CONFIRMED');
+  if (approvalCol > 0) sheet.getRange(rowNumber, approvalCol).setValue('APPROVED');
+
+  const payload = {
+    contactName: get('Contact Name'),
+    contactEmail: get('Contact Email'),
+    contactPhone: get('Contact Phone'),
+    expectedStudents: get('Expected Students'),
+    date: normalizeDate_(get('Date')),
+    time: String(get('Start Time') || ''),
+  };
+  const endTime = String(get('End Time') || '');
+  const schoolName = String(get('School Name') || '');
+  const workshopTitle = String(get('Workshop Title') || '');
+
+  createConfirmedCalendarEvent_(payload, reservationId, schoolName, workshopTitle, endTime);
+  sendConfirmedReservationEmail_(payload, reservationId, schoolName, workshopTitle, endTime);
+
+  if (confirmationCol > 0) sheet.getRange(rowNumber, confirmationCol).setValue('YES');
+  return {ok: true, reservationId, status: 'CONFIRMED'};
+};
+
+export const sendReservationReminder = (reservationId) => {
+  verifyStaff_();
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const rows = getObjects_(ss, 'Reservations');
+  const r = rows.find((item) => String(item['Reservation ID']) === String(reservationId));
+  if (!r) throw new Error('Reservation not found: ' + reservationId);
+  sendReminderEmail_(r);
+  return {ok: true, reservationId};
+};
+
+export const installD3AutomationTriggers = () => {
+  verifyStaff_();
+  ScriptApp.getProjectTriggers()
+    .filter((trigger) => trigger.getHandlerFunction() === 'runD3DailyAutomation')
+    .forEach((trigger) => ScriptApp.deleteTrigger(trigger));
+  ScriptApp.newTrigger('runD3DailyAutomation')
+    .timeBased()
+    .everyDays(1)
+    .atHour(8)
+    .create();
+  return {ok: true, message: 'Daily automation installed for approximately 8 AM.'};
+};
+
+export const runD3DailyAutomation = () => {
+  const settings = getSettings_();
+  if (String(settings['Enable Email Automations']).toUpperCase() !== 'TRUE') return {ok: true, skipped: true};
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName('Reservations');
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0].map((h) => String(h || '').trim());
+  const col = (name) => headers.indexOf(name);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  let sent = 0;
+  for (let i = 1; i < data.length; i += 1) {
+    const status = String(data[i][col('Status')] || '').toUpperCase();
+    if (status !== 'CONFIRMED') continue;
+    const dateStr = normalizeDate_(data[i][col('Date')]);
+    if (!dateStr) continue;
+    const tripDate = new Date(dateStr + 'T12:00:00');
+    const days = Math.round((tripDate - today) / 86400000);
+
+    if (days === 7 && String(data[i][col('Reminder 1 Sent')] || '').toUpperCase() !== 'YES') {
+      const obj = {};
+      headers.forEach((h, idx) => { obj[h] = data[i][idx]; });
+      sendReminderEmail_(obj);
+      sheet.getRange(i + 1, col('Reminder 1 Sent') + 1).setValue('YES');
+      sent += 1;
+    }
+    if (days === 2 && String(data[i][col('Reminder 2 Sent')] || '').toUpperCase() !== 'YES') {
+      const obj = {};
+      headers.forEach((h, idx) => { obj[h] = data[i][idx]; });
+      sendReminderEmail_(obj);
+      sheet.getRange(i + 1, col('Reminder 2 Sent') + 1).setValue('YES');
+      sent += 1;
+    }
+  }
+  return {ok: true, sent};
+};
+
+function createConfirmedCalendarEvent_(payload, reservationId, schoolName, workshopTitle, endTime) {
+  const settings = getSettings_();
+  if (String(settings['Enable Calendar Automations']).toUpperCase() !== 'TRUE') return;
+  const calendarId = String(settings['Calendar ID'] || '').trim();
+  if (!calendarId || calendarId === 'TBD') return;
+  const calendar = CalendarApp.getCalendarById(calendarId);
+  if (!calendar) return;
+  const start = parseDateTime_(payload.date, payload.time);
+  const end = endTime ? parseDateTime_(payload.date, endTime) : new Date(start.getTime() + 90 * 60000);
+  calendar.createEvent(
+    schoolName + ' — ' + workshopTitle,
+    start,
+    end,
+    {
+      description: [
+        'NYC FIRST D3 School Field Trip',
+        'Reservation ID: ' + reservationId,
+        'School: ' + schoolName,
+        'Contact: ' + payload.contactName + ' <' + payload.contactEmail + '>',
+        'Expected students: ' + (payload.expectedStudents || '')
+      ].join('\n')
+    }
+  );
+}
+
+function sendConfirmedReservationEmail_(payload, reservationId, schoolName, workshopTitle, endTime) {
+  const settings = getSettings_();
+  if (String(settings['Enable Email Automations']).toUpperCase() !== 'TRUE') return;
+  const riskFormUrl = String(settings['Risk Form URL'] || '').trim();
+  const costEmail = String(settings['Cost Contact Email'] || 'kat@nycfirst.org').trim();
+  const lines = [
+    'Your NYC FIRST D3 school field trip is confirmed.',
+    '',
+    'Reservation ID: ' + reservationId,
+    'School: ' + schoolName,
+    'Activity: ' + workshopTitle,
+    'Date: ' + payload.date,
+    'Time: ' + payload.time + (endTime ? ' – ' + endTime : ''),
+    'Expected students: ' + (payload.expectedStudents || '')
+  ];
+  if (riskFormUrl && riskFormUrl !== 'TBD') {
+    lines.push('', 'Assumption of Risk form: ' + riskFormUrl);
+  } else {
+    lines.push('', 'Assumption of Risk form: the official link will be sent by NYC FIRST staff.');
+  }
+  lines.push('', 'Questions about field-trip cost: Katiuska Hernandez — ' + costEmail);
+  lines.push('', 'NYC FIRST · Washington Heights STEM Center');
+  MailApp.sendEmail(payload.contactEmail, 'NYC FIRST Field Trip Confirmed — ' + reservationId, lines.join('\n'));
+}
+
+function sendReminderEmail_(reservation) {
+  const settings = getSettings_();
+  if (String(settings['Enable Email Automations']).toUpperCase() !== 'TRUE') return;
+  const riskFormUrl = String(settings['Risk Form URL'] || '').trim();
+  const lines = [
+    'Reminder: your NYC FIRST D3 school field trip is coming up.',
+    '',
+    'Reservation ID: ' + reservation['Reservation ID'],
+    'School: ' + reservation['School Name'],
+    'Activity: ' + reservation['Workshop Title'],
+    'Date: ' + normalizeDate_(reservation['Date']),
+    'Time: ' + reservation['Start Time'] + (reservation['End Time'] ? ' – ' + reservation['End Time'] : '')
+  ];
+  if (riskFormUrl && riskFormUrl !== 'TBD') lines.push('', 'Assumption of Risk form: ' + riskFormUrl);
+  lines.push('', 'NYC FIRST · Washington Heights STEM Center');
+  MailApp.sendEmail(String(reservation['Contact Email']), 'Reminder: NYC FIRST Field Trip — ' + reservation['Reservation ID'], lines.join('\n'));
+}
 
 function verifyStaff_() {
   const email = String(Session.getActiveUser().getEmail() || '').toLowerCase();
