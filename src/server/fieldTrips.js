@@ -963,8 +963,62 @@ export const runD3DailyAutomation = () => {
       sent += 1;
     }
   }
-  return {ok: true, sent};
+  const campaignsSent = runScheduledCampaigns_(ss, settings);
+  return {ok: true, sent, campaignsSent};
 };
+
+function runScheduledCampaigns_(ss, settings) {
+  if (String(settings['Monthly Outreach Campaigns'] || '').toUpperCase().startsWith('DISABLED')) return 0;
+  const sheet = ss.getSheetByName('Email Campaigns');
+  if (!sheet) return 0;
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) return 0;
+  const headers = data[0].map((h) => String(h || '').trim());
+  const idIndex = headers.indexOf('Campaign ID');
+  const statusIndex = headers.indexOf('Status');
+  const scheduledIndex = headers.indexOf('Scheduled Date');
+  const sentIndex = headers.indexOf('Sent Date');
+  if (idIndex < 0 || statusIndex < 0 || scheduledIndex < 0) return 0;
+
+  const today = Utilities.formatDate(new Date(), APP_TIMEZONE, 'yyyy-MM-dd');
+  let sentCount = 0;
+
+  for (let i = 1; i < data.length; i += 1) {
+    const status = String(data[i][statusIndex] || '').toUpperCase();
+    const scheduledDate = normalizeDate_(data[i][scheduledIndex]);
+    if (status !== 'SCHEDULED' || !scheduledDate || scheduledDate > today) continue;
+
+    const campaignId = String(data[i][idIndex] || '').trim();
+    if (!campaignId) continue;
+    const campaign = buildCampaign_(ss, campaignId);
+    if (!campaign.recipients.length) continue;
+
+    const sender = String(settings['Cost Contact Email'] || '').trim();
+    const batchSize = 50;
+    for (let j = 0; j < campaign.recipients.length; j += batchSize) {
+      const chunk = campaign.recipients.slice(j, j + batchSize);
+      MailApp.sendEmail({
+        to: sender,
+        bcc: chunk.join(','),
+        subject: campaign.subject,
+        body: campaign.body,
+        name: 'NYC FIRST',
+        replyTo: sender,
+      });
+    }
+
+    if (sentIndex >= 0) sheet.getRange(i + 1, sentIndex + 1).setValue(today);
+    sheet.getRange(i + 1, statusIndex + 1).setValue('SENT');
+    logCommunication_(ss, {
+      type: 'CAMPAIGN',
+      subject: campaign.subject,
+      campaignId,
+      notes: 'Scheduled campaign sent to ' + campaign.recipients.length + ' recipient(s).',
+    });
+    sentCount += 1;
+  }
+  return sentCount;
+}
 
 function upsertRiskFormRecord_(ss, details) {
   const settings = getSettings_();
