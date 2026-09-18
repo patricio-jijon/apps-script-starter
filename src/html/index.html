@@ -241,20 +241,11 @@
       <div class="costbox">
         Field trips, community workshops, open hours, credit-bearing classes, FIRST LEGO League, and FIRST Tech Challenge are part of the Center's programming. Valid NYC FIRST Member Cards are required for open hours and community workshops.
         <br><br>
-        <a href="https://www.nycfirst.org/stem-center-locations/wh" target="_blank" rel="noopener">View the official Washington Heights STEM Center page</a>
+        <a id="stemCenterLink" href="https://www.nycfirst.org/stem-center-locations/wh" target="_blank" rel="noopener">View the official Washington Heights STEM Center page</a>
         ·
-        <a href="https://dashboard.nycfirst.org/check-in/washington-heights" target="_blank" rel="noopener">Submit a Member Card</a>
+        <a id="memberCardLinkCenter" href="https://dashboard.nycfirst.org/check-in/washington-heights" target="_blank" rel="noopener">Submit a Member Card</a>
       </div>
-      <div class="curriculum">
-        <div class="path"><h4>Laser Cutter</h4><p><b>Epilog Helix 24</b><br>Digital fabrication for laser cutting and engraving projects.</p></div>
-        <div class="path"><h4>CNC Router</h4><p><b>ShopBot Desktop Max</b><br>Computer-controlled routing for subtractive fabrication and prototyping.</p></div>
-        <div class="path"><h4>3D Printing</h4><p><b>Markforged Onyx One</b><br><b>Bambu Lab P1S</b><br><b>Bambu Lab X1C</b><br><b>Formlabs Form 2</b></p></div>
-        <div class="path"><h4>Computers</h4><p><b>Apple iMac 27</b><br>Workstations for coding, CAD, design, digital media, and fabrication workflows.</p></div>
-        <div class="path"><h4>3D Design</h4><p><b>Autodesk Fusion 360</b><br>CAD modeling, mechanical design, assemblies, and prototype development.</p></div>
-        <div class="path"><h4>2D Design</h4><p><b>Adobe Illustrator</b><br><b>Adobe Photoshop</b><br><b>Cricut Design Space</b></p></div>
-        <div class="path"><h4>3D Printing Software</h4><p><b>Bambu Studio</b><br>Print preparation and slicing for Bambu Lab machines.</p></div>
-        <div class="path"><h4>Robotics Support</h4><p>The Center supports FLL and FTC teams with build, coding, fabrication, prototyping, competition practice, and engineering iteration.</p></div>
-      </div>
+      <div id="equipmentGrid" class="curriculum"></div>
     </section>
 
     <section id="curriculum">
@@ -270,6 +261,20 @@
         <div class="path"><h4>📐 Standards Mapping</h4><p>Demo fields are ready for NYSP12SLS, NYS Computer Science & Digital Fluency, math, arts, and your official curriculum standards.</p></div>
       </div>
     </section>
+
+    <footer style="padding:34px 0 8px;border-top:1px solid var(--line);margin-top:24px">
+      <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;justify-content:space-between">
+        <div>
+          <b>NYC FIRST · Washington Heights STEM Center</b>
+          <div class="footnote">D3 School Field Trips 2026–2027 · What STEM education should be.</div>
+        </div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <a id="nycFirstFooterLink" href="https://www.nycfirst.org/" target="_blank" rel="noopener">NYC FIRST Website</a>
+          <a id="memberCardFooterLink" href="https://dashboard.nycfirst.org/check-in/washington-heights" target="_blank" rel="noopener">Submit Member Card</a>
+          <a href="?view=staff">NYC FIRST Staff</a>
+        </div>
+      </div>
+    </footer>
   </main>
 
   <div id="workshopModal" class="modal" onclick="modalOutside(event)">
@@ -292,7 +297,7 @@
         state.data = data;
         const first = data.availability && data.availability[0] ? new Date(data.availability[0].date + 'T12:00:00') : new Date();
         state.calendarMonth = new Date(first.getFullYear(), first.getMonth(), 1);
-        renderWorkshops(); renderSchoolChoices(); renderDirectory(); renderContacts(); renderCalendar();
+        renderWorkshops(); renderSchoolChoices(); renderDirectory(); renderContacts(); renderCalendar(); renderEquipment(); applyPublicLinks();
       })
       .withFailureHandler(err => showNotice(err.message || String(err), 'error'))
       .getAppData();
@@ -312,6 +317,31 @@
     }catch(e){}
   }
   function esc(v){ return String(v ?? '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[s])); }
+
+  function applyPublicLinks(){
+    const links=state.data&&state.data.publicLinks?state.data.publicLinks:{};
+    const pairs=[
+      ['stemCenterLink',links.stemCenterPage],
+      ['memberCardLinkCenter',links.memberCard],
+      ['nycFirstFooterLink',links.website],
+      ['memberCardFooterLink',links.memberCard]
+    ];
+    pairs.forEach(([id,url])=>{const el=document.getElementById(id);if(el&&url)el.href=url;});
+  }
+
+  function renderEquipment(){
+    const grid=document.getElementById('equipmentGrid'); if(!grid)return;
+    const rows=(state.data.equipment||[]).filter(x=>x.active!==false);
+    if(!rows.length){
+      grid.innerHTML='<div class="path"><h4>Equipment information coming soon</h4><p>NYC FIRST staff can manage this section from the Staff Admin interface.</p></div>';
+      return;
+    }
+    grid.innerHTML=rows.map(item=>`
+      <div class="path">
+        <h4>${esc(item.name)}</h4>
+        <p><b>${esc(item.category)} · ${esc(item.type)}</b><br>${esc(item.description)}</p>
+      </div>`).join('');
+  }
 
   function renderWorkshops(){
     const grid = document.getElementById('workshopGrid');
