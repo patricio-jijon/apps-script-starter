@@ -26,11 +26,16 @@
     ]
   },
   "exceptionLogging": "STACKDRIVER",
-  "oauthScopes": ["https://www.googleapis.com/auth/gmail.send"],
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive",
+    "https://www.googleapis.com/auth/script.external_request",
+    "https://www.googleapis.com/auth/gmail.send"
+  ],
   "runtimeVersion": "V8",
-  "timeZone": "Asia/Calcutta",
+  "timeZone": "America/New_York",
   "webapp": {
     "access": "ANYONE",
-    "executeAs": "USER_ACCESSING"
+    "executeAs": "USER_DEPLOYING"
   }
 }
