@@ -43,6 +43,7 @@
       </section>
       <section id="workshops" class="view hidden"></section>
       <section id="availability" class="view hidden"></section>
+      <section id="schools" class="view hidden"></section>
       <section id="contacts" class="view hidden"></section>
       <section id="templates" class="view hidden"></section>
       <section id="campaigns" class="view hidden"></section>
@@ -58,7 +59,7 @@
 const state={data:null};
 const sections=[
   ['dashboard','Dashboard'],['reservations','Reservations'],['workshops','Activities'],
-  ['availability','Calendar / Availability'],['contacts','D3 Schools & Teachers'],
+  ['availability','Calendar / Availability'],['schools','D3 Schools'],['contacts','Teachers & STEM Contacts'],
   ['templates','Letters / Templates'],['campaigns','Communications / Campaigns'],
   ['media','Images & Media'],['equipment','Equipment & Machines'],['risk','Assumption of Risk'],['attendance','Attendance'],['settings','Settings']
 ];
@@ -108,6 +109,14 @@ function render(){
     ],d.availability)+
     table('Availability',d.availability,['Date','Start Time','End Time','Status','Workshop Restrictions','Capacity / School Slots','Calendar Event ID','Staff Notes'],
       r=>'<button class="btn secondary" onclick="openAvailabilityEditor('+Number(d.availability.indexOf(r))+')">Edit</button>');
+
+  document.getElementById('schools').innerHTML=
+    editorIntro('D3 Schools','Manage the school directory shown in the public booking app.')+
+    editorLauncher('D3 Schools','School ID / DBN','School',[
+      ['School Name','text'],['Type','text'],['Address','textarea'],['Grades','text'],['Outreach Contact Status','text'],['Active','select:TRUE|FALSE']
+    ],d.schools||[])+
+    table('D3 Schools',d.schools||[],['School ID / DBN','School Name','Type','Address','Grades','Outreach Contact Status','Active'],
+      r=>'<button class="btn secondary" onclick="openEditor(\\'D3 Schools\\',\\'School ID / DBN\\',\\''+jsq(r['School ID / DBN'])+'\\')">Edit</button>');
 
   document.getElementById('contacts').innerHTML=
     editorIntro('D3 Schools & STEM Contacts','Maintain teachers, parent coordinators, STEM leads, email addresses, outreach status, and communication notes.')+
@@ -167,6 +176,7 @@ function reservationActions(r){
   let out='<div class="toolbar">';
   if(status!=='CONFIRMED'&&status!=='CANCELLED') out+='<button class="btn primary" onclick="approveReservationUI(\''+id+'\')">Approve</button>';
   if(status==='CONFIRMED') out+='<button class="btn secondary" onclick="sendReminderUI(\''+id+'\')">Send reminder</button>';
+  if(status!=='CANCELLED') out+='<button class="btn danger" onclick="cancelReservationUI(\''+id+'\')">Cancel</button>';
   out+='</div>';
   return out;
 }
@@ -181,7 +191,7 @@ function editorLauncher(sheet,key,label,fields,rows){
 function jsq(v){return String(v??'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,' ')}
 function findRecord(sheet,key,keyValue){
   const map={
-    'Workshops':'workshops','Availability':'availability','Outreach Contacts':'contacts','Email Campaigns':'campaigns',
+    'D3 Schools':'schools','Workshops':'workshops','Availability':'availability','Outreach Contacts':'contacts','Email Campaigns':'campaigns',
     'Email Templates':'templates','Media Library':'media','Risk Forms':'riskForms','Attendance':'attendance','Equipment':'equipment'
   };
   const rows=state.data[map[sheet]]||[];
@@ -189,6 +199,7 @@ function findRecord(sheet,key,keyValue){
 }
 function fieldsForSheet(sheet){
   const defs={
+    'D3 Schools':[['School Name','text'],['Type','text'],['Address','textarea'],['Grades','text'],['Outreach Contact Status','text'],['Active','select:TRUE|FALSE']],
     'Workshops':[['Public Title','text'],['Internal / Official Title','text'],['Category','text'],['Description','textarea'],['Publication Status','select:Featured|Published|Activity Library|Draft|Archived'],['Age / Grade Band','text'],['Duration','text'],['Capacity','text'],['Learning Objectives','textarea'],['Academic Standards','textarea'],['Photo / Media','text'],['Video URL','text']],
     'Availability':[['Start Time','text'],['End Time','text'],['Status','select:OPEN|HOLD|BOOKED|CLOSED'],['Workshop Restrictions','text'],['Capacity / School Slots','text'],['Staff Notes','textarea']],
     'Outreach Contacts':[['School ID / DBN','text'],['School','text'],['Contact Name','text'],['Role','text'],['Phone','text'],['Verified','text'],['Outreach Status','text'],['Last Contacted','text'],['Notes','textarea']],
@@ -272,6 +283,12 @@ function sendReminderUI(id){
   showNotice('Sending reminder…','ok');
   google.script.run.withSuccessHandler(()=>showNotice('Reminder sent.','ok'))
     .withFailureHandler(e=>showNotice(e.message||e,'err')).sendReservationReminder(id);
+}
+function cancelReservationUI(id){
+  if(!confirm('Cancel '+id+'? The held/booked time slot will be reopened.'))return;
+  showNotice('Cancelling reservation…','ok');
+  google.script.run.withSuccessHandler(()=>{showNotice('Reservation cancelled and slot reopened.','ok');reloadData();})
+    .withFailureHandler(e=>showNotice(e.message||e,'err')).cancelReservation(id);
 }
 function installTriggersUI(){
   showNotice('Installing daily trigger…','ok');
