@@ -297,13 +297,23 @@
         state.data = data;
         const first = data.availability && data.availability[0] ? new Date(data.availability[0].date + 'T12:00:00') : new Date();
         state.calendarMonth = new Date(first.getFullYear(), first.getMonth(), 1);
-        renderWorkshops(); renderSchoolChoices(); renderDirectory(); renderContacts(); renderCalendar(); renderEquipment(); applyPublicLinks();
+        renderWorkshops(); renderSchoolChoices(); renderDirectory(); renderContacts(); renderCalendar(); renderEquipment(); applyPublicLinks(); openSharedActivityFromHash();
       })
       .withFailureHandler(err => showNotice(err.message || String(err), 'error'))
       .getAppData();
   }
 
   function go(id){ document.getElementById(id).scrollIntoView({behavior:'smooth',block:'start'}); }
+  function openSharedActivityFromHash(){
+    const hash=window.location.hash||'';
+    const match=hash.match(/^#activity=(.+)$/);
+    if(!match)return;
+    const id=decodeURIComponent(match[1]);
+    const exists=state.data&&state.data.workshops&&state.data.workshops.some(w=>w.id===id);
+    if(exists){
+      setTimeout(()=>{openWorkshop(id);go('activities');},150);
+    }
+  }
   async function shareWorkshop(id,event){
     if(event)event.stopPropagation();
     const w=state.data.workshops.find(x=>x.id===id); if(!w)return;
