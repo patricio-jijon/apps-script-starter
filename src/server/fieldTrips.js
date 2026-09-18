@@ -866,6 +866,29 @@ function sendReminderEmail_(reservation) {
   MailApp.sendEmail(String(reservation['Contact Email']), 'Reminder: NYC FIRST Field Trip — ' + reservation['Reservation ID'], lines.join('\n'));
 }
 
+function logCommunication_(ss, details) {
+  const sheet = ss.getSheetByName('Communication Log');
+  if (!sheet) return;
+  const data = sheet.getDataRange().getValues();
+  const headers = (data[0] || []).map((h) => String(h || '').trim());
+  const values = {
+    'Timestamp': Utilities.formatDate(new Date(), APP_TIMEZONE, 'yyyy-MM-dd HH:mm:ss'),
+    'School ID / DBN': String(details.schoolId || ''),
+    'School': String(details.school || ''),
+    'Contact Name': String(details.contactName || ''),
+    'Contact Email': String(details.contactEmail || ''),
+    'Type': String(details.type || ''),
+    'Subject / Purpose': String(details.subject || ''),
+    'Reservation ID': String(details.reservationId || ''),
+    'Campaign ID': String(details.campaignId || ''),
+    'Staff Email': String(Session.getActiveUser().getEmail() || ''),
+    'Notes': String(details.notes || ''),
+  };
+  sheet.appendRow(headers.map((header) =>
+    Object.prototype.hasOwnProperty.call(values, header) ? values[header] : ''
+  ));
+}
+
 function buildStaffAnalytics_(ss) {
   const schools = getObjects_(ss, 'D3 Schools');
   const contacts = getObjects_(ss, 'Outreach Contacts');
