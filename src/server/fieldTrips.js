@@ -3,6 +3,7 @@ const SPREADSHEET_ID = '1DCUsuG_uV1u15rLWXlJ0-Tn3yk7JnsZfdMaBM3XjB8g';
 
 export const getAppData = () => {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const settings = getSettings_();
   const schools = getObjects_(ss, 'D3 Schools').map((r) => ({
     id: r['School ID / DBN'] || '',
     name: r['School Name'] || '',
@@ -59,8 +60,13 @@ export const getAppData = () => {
       tagline: 'What STEM education should be.',
     },
     publicContacts: {
-      costName: 'Katiuska Hernandez',
-      costEmail: 'kat@nycfirst.org',
+      costName: String(settings['Cost Contact Name'] || 'Katiuska Hernandez'),
+      costEmail: String(settings['Cost Contact Email'] || 'kat@nycfirst.org'),
+    },
+    publicLinks: {
+      website: String(settings['NYC FIRST Website'] || 'https://www.nycfirst.org/'),
+      memberCard: String(settings['Member Card Submission URL'] || 'https://dashboard.nycfirst.org/check-in/washington-heights'),
+      riskForm: String(settings['Risk Form URL'] || ''),
     },
     demo: false,
     databaseReady: true,
