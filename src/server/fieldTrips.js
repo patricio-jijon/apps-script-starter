@@ -361,6 +361,7 @@ export const getStaffAdminData = () => {
     media: serializeRows_(getObjects_(ss, 'Media Library')),
     riskForms: serializeRows_(getObjects_(ss, 'Risk Forms')),
     attendance: serializeRows_(getObjects_(ss, 'Attendance')),
+    communicationLog: serializeRows_(getObjects_(ss, 'Communication Log')).reverse().slice(0, 500),
     analytics: buildStaffAnalytics_(ss),
     settings: serializeObject_(getSettings_()),
     staffEmail: Session.getActiveUser().getEmail(),
@@ -550,6 +551,7 @@ export const saveStaffRecord = (sheetName, keyHeader, keyValue, values) => {
     'Risk Forms': true,
     'Attendance': true,
     'Equipment': true,
+    'Communication Log': true,
   };
   if (!allowed[sheetName]) throw new Error('This section cannot be edited from the staff interface.');
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
