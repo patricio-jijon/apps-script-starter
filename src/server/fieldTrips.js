@@ -307,6 +307,16 @@ function maybeSendReservationEmails_(payload, reservationId, schoolName, worksho
   MailApp.sendEmail(payload.contactEmail, subject, body);
 
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  logCommunication_(ss, {
+    schoolId: String(payload.schoolId || ''),
+    school: schoolName,
+    contactName: String(payload.contactName || ''),
+    contactEmail: String(payload.contactEmail || ''),
+    type: 'REQUEST ACKNOWLEDGEMENT',
+    subject,
+    reservationId,
+    notes: 'Reservation request acknowledgement sent.',
+  });
   const explicitRecipients = String(settings['Internal Booking Alert Emails'] || '')
     .split(',')
     .map((s) => s.trim())
@@ -829,8 +839,9 @@ export const sendReservationReminder = (reservationId) => {
   const rows = getObjects_(ss, 'Reservations');
   const r = rows.find((item) => String(item['Reservation ID']) === String(reservationId));
   if (!r) throw new Error('Reservation not found: ' + reservationId);
-  sendReminderEmail_(r);
-  return {ok: true, reservationId};
+  const sent = sendReminderEmail_(r);
+  if (!sent) throw new Error('Email automations are disabled in Settings.');
+  return {ok: true, reservationId, sent: true};
 };
 
 export const installD3AutomationTriggers = () => {
@@ -972,7 +983,18 @@ function sendConfirmedReservationEmail_(payload, reservationId, schoolName, work
   }
   lines.push('', 'Questions about field-trip cost: Katiuska Hernandez — ' + costEmail);
   lines.push('', 'NYC FIRST · Washington Heights STEM Center');
-  MailApp.sendEmail(payload.contactEmail, 'NYC FIRST Field Trip Confirmed — ' + reservationId, lines.join('\n'));
+  const subject = 'NYC FIRST Field Trip Confirmed — ' + reservationId;
+  MailApp.sendEmail(payload.contactEmail, subject, lines.join('\n'));
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  logCommunication_(ss, {
+    school: schoolName,
+    contactName: String(payload.contactName || ''),
+    contactEmail: String(payload.contactEmail || ''),
+    type: 'CONFIRMATION',
+    subject,
+    reservationId,
+    notes: 'Final field-trip confirmation sent.',
+  });
   return true;
 }
 
@@ -991,7 +1013,20 @@ function sendReminderEmail_(reservation) {
   ];
   if (riskFormUrl && riskFormUrl !== 'TBD') lines.push('', 'Assumption of Risk form: ' + riskFormUrl);
   lines.push('', 'NYC FIRST · Washington Heights STEM Center');
-  MailApp.sendEmail(String(reservation['Contact Email']), 'Reminder: NYC FIRST Field Trip — ' + reservation['Reservation ID'], lines.join('\n'));
+  const subject = 'Reminder: NYC FIRST Field Trip — ' + reservation['Reservation ID'];
+  MailApp.sendEmail(String(reservation['Contact Email']), subject, lines.join('\n'));
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  logCommunication_(ss, {
+    schoolId: String(reservation['School ID / DBN'] || ''),
+    school: String(reservation['School Name'] || ''),
+    contactName: String(reservation['Contact Name'] || ''),
+    contactEmail: String(reservation['Contact Email'] || ''),
+    type: 'REMINDER',
+    subject,
+    reservationId: String(reservation['Reservation ID'] || ''),
+    notes: 'Field-trip reminder sent.',
+  });
+  return true;
 }
 
 function logCommunication_(ss, details) {
