@@ -461,7 +461,7 @@ export const recordAttendance = (reservationId, payload) => {
   };
 };
 
-export const markSchoolContacted = (contactEmail) => {
+export const markSchoolContacted = (contactEmail, notes) => {
   verifyStaff_();
   const email = String(contactEmail || '').trim().toLowerCase();
   if (!email) throw new Error('A contact email is required.');
@@ -478,6 +478,17 @@ export const markSchoolContacted = (contactEmail) => {
     if (String(data[i][emailIndex] || '').trim().toLowerCase() === email) {
       const today = Utilities.formatDate(new Date(), APP_TIMEZONE, 'yyyy-MM-dd');
       sheet.getRange(i + 1, contactedIndex + 1).setValue(today);
+      const row = {};
+      headers.forEach((header, index) => { if (header) row[header] = data[i][index]; });
+      logCommunication_(ss, {
+        schoolId: String(row['School ID / DBN'] || ''),
+        school: String(row['School'] || ''),
+        contactName: String(row['Contact Name'] || ''),
+        contactEmail: String(row['Email'] || contactEmail),
+        type: 'FOLLOW-UP',
+        subject: 'Manual school follow-up',
+        notes: String(notes || 'Marked contacted from Staff Admin.'),
+      });
       return {ok: true, email: contactEmail, lastContacted: today};
     }
   }
