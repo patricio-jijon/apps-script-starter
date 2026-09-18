@@ -346,9 +346,64 @@ export const getStaffAdminData = () => {
     media: getObjects_(ss, 'Media Library'),
     riskForms: getObjects_(ss, 'Risk Forms'),
     attendance: getObjects_(ss, 'Attendance'),
+    analytics: buildStaffAnalytics_(ss),
     settings: getSettings_(),
     staffEmail: Session.getActiveUser().getEmail(),
   };
+};
+
+export const geocodeD3Schools = () => {
+  verifyStaff_();
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName('D3 Schools');
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) return {ok: true, updated: 0, remaining: 0, failed: 0};
+
+  const headers = data[0].map((h) => String(h || '').trim());
+  const addressCol = headers.indexOf('Address');
+  const latCol = headers.indexOf('Latitude');
+  const lngCol = headers.indexOf('Longitude');
+  if (addressCol < 0 || latCol < 0 || lngCol < 0) {
+    throw new Error('D3 Schools needs Address, Latitude, and Longitude columns.');
+  }
+
+  const geocoder = Maps.newGeocoder().setRegion('us');
+  let updated = 0;
+  let failed = 0;
+  const maxPerRun = 25;
+
+  for (let i = 1; i < data.length && updated < maxPerRun; i += 1) {
+    const address = String(data[i][addressCol] || '').trim();
+    const hasLat = Number.isFinite(Number(data[i][latCol])) && String(data[i][latCol]).trim() !== '';
+    const hasLng = Number.isFinite(Number(data[i][lngCol])) && String(data[i][lngCol]).trim() !== '';
+    if (!address || (hasLat && hasLng)) continue;
+
+    try {
+      const result = geocoder.geocode(address);
+      if (result && result.status === 'OK' && result.results && result.results.length) {
+        const location = result.results[0].geometry.location;
+        sheet.getRange(i + 1, latCol + 1).setValue(location.lat);
+        sheet.getRange(i + 1, lngCol + 1).setValue(location.lng);
+        updated += 1;
+      } else {
+        failed += 1;
+      }
+    } catch (error) {
+      failed += 1;
+    }
+    Utilities.sleep(120);
+  }
+
+  const refreshed = sheet.getDataRange().getValues();
+  let remaining = 0;
+  for (let i = 1; i < refreshed.length; i += 1) {
+    const address = String(refreshed[i][addressCol] || '').trim();
+    const lat = String(refreshed[i][latCol] || '').trim();
+    const lng = String(refreshed[i][lngCol] || '').trim();
+    if (address && (!lat || !lng)) remaining += 1;
+  }
+
+  return {ok: true, updated, remaining, failed};
 };
 
 export const saveStaffRecord = (sheetName, keyHeader, keyValue, values) => {
@@ -625,6 +680,145 @@ function sendReminderEmail_(reservation) {
   if (riskFormUrl && riskFormUrl !== 'TBD') lines.push('', 'Assumption of Risk form: ' + riskFormUrl);
   lines.push('', 'NYC FIRST · Washington Heights STEM Center');
   MailApp.sendEmail(String(reservation['Contact Email']), 'Reminder: NYC FIRST Field Trip — ' + reservation['Reservation ID'], lines.join('\n'));
+}
+
+function buildStaffAnalytics_(ss) {
+  const schools = getObjects_(ss, 'D3 Schools');
+  const contacts = getObjects_(ss, 'Outreach Contacts');
+  const reservations = getObjects_(ss, 'Reservations');
+  const attendanceRows = getObjects_(ss, 'Attendance');
+
+  const attendanceByReservation = {};
+  attendanceRows.forEach((row) => {
+    const id = String(row['Reservation ID'] || '').trim();
+    if (!id) return;
+    attendanceByReservation[id] = row;
+  });
+
+  const contactBySchool = {};
+  contacts.forEach((contact) => {
+    const schoolId = String(contact['School ID / DBN'] || '').trim();
+    if (!schoolId || schoolId === 'DISTRICT-3') return;
+    const existing = contactBySchool[schoolId];
+    const role = String(contact['Role'] || '');
+    const priority = /STEM|SCIENCE|ROBOT|ENGINEER|TEACHER/i.test(role) ? 2 : 1;
+    const existingPriority = existing && /STEM|SCIENCE|ROBOT|ENGINEER|TEACHER/i.test(String(existing['Role'] || '')) ? 2 : (existing ? 1 : 0);
+    if (!existing || priority > existingPriority) contactBySchool[schoolId] = contact;
+  });
+
+  const statsBySchool = {};
+  schools.forEach((school) => {
+    const id = String(school['School ID / DBN'] || '').trim();
+    if (!id) return;
+    const contact = contactBySchool[id] || {};
+    statsBySchool[id] = {
+      schoolId: id,
+      schoolName: String(school['School Name'] || ''),
+      type: String(school['Type'] || ''),
+      address: String(school['Address'] || ''),
+      grades: String(school['Grades'] || ''),
+      latitude: Number(school['Latitude']) || null,
+      longitude: Number(school['Longitude']) || null,
+      contactName: String(contact['Contact Name'] || ''),
+      contactEmail: String(contact['Email'] || ''),
+      contactRole: String(contact['Role'] || ''),
+      contactPhone: String(contact['Phone'] || ''),
+      outreachStatus: String(contact['Outreach Status'] || school['Outreach Contact Status'] || ''),
+      lastContacted: normalizeDate_(contact['Last Contacted']),
+      contactNotes: String(contact['Notes'] || ''),
+      reservations: 0,
+      confirmed: 0,
+      cancelled: 0,
+      completedTrips: 0,
+      expectedStudents: 0,
+      actualStudents: 0,
+      lastTrip: '',
+    };
+  });
+
+  const monthly = {};
+  const activities = {};
+  let totalReservations = 0;
+  let totalCancelled = 0;
+  let totalCompletedTrips = 0;
+  let totalExpected = 0;
+  let totalActual = 0;
+
+  reservations.forEach((reservation) => {
+    const schoolId = String(reservation['School ID / DBN'] || '').trim();
+    const stat = statsBySchool[schoolId];
+    if (!stat) return;
+
+    const status = String(reservation['Status'] || '').toUpperCase();
+    const expected = Number(reservation['Expected Students']) || 0;
+    const attendance = attendanceByReservation[String(reservation['Reservation ID'] || '').trim()] || {};
+    const actual = Number(reservation['Actual Students']) || Number(attendance['Actual Students']) || 0;
+    const date = normalizeDate_(reservation['Date']);
+    const activity = String(reservation['Workshop Title'] || '').trim();
+
+    if (status === 'CANCELLED') {
+      stat.cancelled += 1;
+      totalCancelled += 1;
+      return;
+    }
+
+    stat.reservations += 1;
+    totalReservations += 1;
+    stat.expectedStudents += expected;
+    totalExpected += expected;
+
+    if (['CONFIRMED','RISK FORMS SENT','RISK FORMS COMPLETE','REMINDER SENT','COMPLETED'].includes(status)) {
+      stat.confirmed += 1;
+    }
+
+    if (activity) activities[activity] = (activities[activity] || 0) + 1;
+
+    if (actual > 0 || status === 'COMPLETED') {
+      stat.completedTrips += 1;
+      stat.actualStudents += actual;
+      totalCompletedTrips += 1;
+      totalActual += actual;
+      if (date && (!stat.lastTrip || date > stat.lastTrip)) stat.lastTrip = date;
+      if (date) {
+        const month = date.slice(0, 7);
+        if (!monthly[month]) monthly[month] = {month, attendance: 0, trips: 0};
+        monthly[month].attendance += actual;
+        monthly[month].trips += 1;
+      }
+    }
+  });
+
+  const schoolStats = Object.values(statsBySchool);
+  const topSchools = schoolStats
+    .filter((s) => s.actualStudents > 0 || s.completedTrips > 0)
+    .sort((a, b) => b.actualStudents - a.actualStudents || b.completedTrips - a.completedTrips)
+    .slice(0, 12);
+
+  const activityStats = Object.keys(activities)
+    .map((name) => ({name, bookings: activities[name]}))
+    .sort((a, b) => b.bookings - a.bookings)
+    .slice(0, 12);
+
+  const followUp = schoolStats
+    .filter((s) => s.contactEmail || s.contactName || s.reservations > 0)
+    .sort((a, b) => (b.lastTrip || '').localeCompare(a.lastTrip || '') || b.actualStudents - a.actualStudents);
+
+  return {
+    totals: {
+      schools: schoolStats.length,
+      schoolsWithTrips: schoolStats.filter((s) => s.completedTrips > 0).length,
+      reservations: totalReservations,
+      cancelled: totalCancelled,
+      completedTrips: totalCompletedTrips,
+      expectedStudents: totalExpected,
+      actualStudents: totalActual,
+    },
+    schoolStats,
+    topSchools,
+    monthly: Object.values(monthly).sort((a, b) => a.month.localeCompare(b.month)),
+    activities: activityStats,
+    followUp,
+  };
 }
 
 function verifyStaff_() {
