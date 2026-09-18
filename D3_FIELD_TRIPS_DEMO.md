@@ -1,107 +1,219 @@
-# D3 STEM Field Trips Demo
+# NYC FIRST D3 School Field Trip App 2026–2027
 
-This branch contains a working prototype for a District 3 STEM field-trip reservation web app.
+This branch contains the working prototype and production architecture for the District 3 School Field Trip system managed by NYC FIRST at the Washington Heights STEM Center.
 
 ## Architecture
 
-- **GitHub**: source code, version history, review, collaboration.
-- **Google Apps Script**: live web application and server-side functions.
-- **Google Sheets**: reservation database and staff operations table.
-- **Google Drive**: stores the generated spreadsheet and future media/documents if desired.
+The system has three user-facing layers plus Google Workspace services behind them.
 
-The first time the app backend is called, it creates a spreadsheet named:
+### 1. Public School Front End
+For District 3 schools, teachers, STEM coordinators, and school staff.
 
-`D3 STEM Field Trips Reservations - DEMO`
+Core functions:
+- Browse available STEM field-trip activities.
+- Open activity details with grade band, duration, capacity, descriptions, curriculum, images, and videos.
+- Share an individual activity link.
+- Select school, activity, date, and time.
+- Submit a reservation request.
+- Access the NYC FIRST Member Card link.
+- Access the NYC FIRST website and Washington Heights STEM Center page.
+- View Washington Heights equipment and machine information.
+- Contact Katiuska Hernandez at `kat@nycfirst.org` for field-trip cost information.
 
-and saves its spreadsheet ID in Script Properties.
+### 2. Google Apps Script Back End
+Server-side application logic.
 
-## Demo features
+Core functions:
+- Read public content from Google Sheets.
+- Validate requested dates/times.
+- Prevent duplicate booking of the same slot.
+- Write reservation records.
+- Send booking notifications.
+- Create confirmed Google Calendar events.
+- Include the Assumption of Risk link in confirmation/reminder communications.
+- Run scheduled reminder automations.
+- Authorize NYC FIRST staff dashboard access.
+- Save staff edits back to the central database.
 
-- District 3 school directory with DBN, school type, address, grades, and outreach-contact status.
-- Public District 3 leadership and school outreach contacts.
-- Workshop catalog for robotics/FLL, 3D design, laser cutting, solar/environmental engineering, block coding, physical computing, chemistry, sound engineering, and environmental sensing.
-- Activity detail modal with temporary illustrations/video placeholders.
-- Four-step reservation flow.
-- Clickable monthly availability calendar.
-- Date/time collision check.
-- Contact and group information.
-- Accessibility/learning-needs field.
-- Temporary assumption-of-risk acknowledgement placeholder.
-- Reservation confirmation ID.
-- Google Sheets database with separate tabs for Reservations, D3 Schools, Outreach Contacts, Workshops, Availability, and Settings.
-- Attendance field (`Actual Students`) for staff to complete after the visit.
-- Curriculum fields for scope/sequence, learning objectives, pathways, and standards.
+### 3. NYC FIRST Staff Admin Interface
+Private interface for approved NYC FIRST staff.
 
-## Important demo notes
+Staff controls:
+- Reservation review and approval.
+- Manual reminder sending.
+- Activities and public descriptions.
+- Calendar / availability.
+- Images and videos.
+- Washington Heights equipment and software.
+- District 3 school and STEM-teacher/contact database.
+- Invitation letters.
+- Reservation confirmation letters.
+- Reminder letters.
+- Monthly promotional communications.
+- Assumption of Risk workflow.
+- Attendance.
+- System settings and automation controls.
 
-1. Workshop titles, content, capacities, schedule, images/videos, and risk language are placeholders until the official material is supplied.
-2. Public school contacts should be re-verified before outreach. A Parent Coordinator or district family contact is not automatically the official STEM/field-trip decision maker.
-3. District 3 school data should be reconciled with the final official NYC FIRST/District 3 school list before launch.
-4. The current availability generator opens Tuesdays, Wednesdays, and Thursdays at 10:00 AM and 12:30 PM for roughly the next 100 days. Replace this with the actual operating calendar.
+Staff access is controlled through the `Staff Access` sheet and the signed-in Google account.
 
-## Deploy to Google Apps Script
+## Google Workspace Services
 
-The repository's `.clasp.json` still contains `<DEV_PROJECT_ID>`, so it is not yet connected to a real Apps Script project.
+- **Google Sheets** — central database and content-management source.
+- **Google Calendar** — confirmed field-trip calendar.
+- **Gmail / MailApp** — school confirmations, staff alerts, reminders, invitations, and promotional campaigns.
+- **Google Drive** — risk forms, activity images, media, documents, and future uploaded files.
+- **Google Apps Script** — web app hosting, automation engine, permissions, and backend.
+- **GitHub** — source control, review, version history, and deployment source.
 
-### First deployment
+## Live Database
 
-1. Install Node.js.
-2. Clone this repository and checkout `d3-field-trips-demo`.
-3. Run `npm install`.
-4. Run `npx clasp login` and authorize the NYC FIRST Google account that should own the reservation spreadsheet.
-5. Create a standalone Apps Script project:
+The app is connected to the native Google Sheet:
+
+**D3 School Field Trip APP 2026-2027**
+
+Current tabs:
+- Reservations
+- D3 Schools
+- Outreach Contacts
+- Workshops
+- Availability
+- Risk Forms
+- Email Campaigns
+- Email Templates
+- Media Library
+- Staff Access
+- Settings
+- Attendance
+- Equipment
+
+## Reservation Workflow
+
+1. School user opens the public field-trip app.
+2. The app loads active schools, activities, equipment content, and available slots from Google Sheets.
+3. The school selects a school, activity, date, and time.
+4. Contact and attendance-estimate information is submitted.
+5. The backend checks that the slot is still open.
+6. The request is written to the `Reservations` sheet with status `REQUESTED`.
+7. The selected availability slot is marked as booked/held.
+8. A school request acknowledgement can be emailed automatically.
+9. Every new reservation alert is configured for:
+   - `patricio@nycfirst.org`
+   - `mariana@nycfirst.org`
+   - `kat@nycfirst.org`
+10. NYC FIRST staff reviews the request in the Staff Admin interface.
+11. Staff approves the request.
+12. Status becomes `CONFIRMED`.
+13. When enabled, the system creates a Google Calendar event.
+14. A confirmation email is sent to the school.
+15. The confirmation includes the official Assumption of Risk link once configured.
+16. Daily automation can send reminders 7 days and 2 days before the visit.
+17. After the field trip, staff enters actual attendance and closes the record.
+
+## Communications
+
+The database includes editable templates for:
+- Reservation received
+- Reservation confirmed
+- Reminder communications
+- Monthly District 3 promotion
+
+The Staff Admin interface is designed to expand this into:
+- invitation letters
+- school outreach letters
+- custom confirmation copy
+- risk-form messages
+- follow-up communications
+
+## Public Links
+
+- NYC FIRST: https://www.nycfirst.org/
+- Washington Heights STEM Center: https://www.nycfirst.org/stem-center-locations/wh
+- Washington Heights Member Card: https://dashboard.nycfirst.org/check-in/washington-heights
+
+## Washington Heights STEM Center Content
+
+The public app includes an equipment/machines section controlled by the `Equipment` sheet. Current items include:
+- Epilog Helix 24 laser cutter
+- ShopBot Desktop Max CNC router
+- Markforged Onyx One
+- Bambu Lab P1S
+- Bambu Lab X1C
+- Formlabs Form 2
+- Apple iMac 27
+- Autodesk Fusion 360
+- Adobe Illustrator
+- Adobe Photoshop
+- Cricut Design Space
+- Bambu Studio
+
+The same system can be expanded with new machines/software without editing the public page code.
+
+## Current Automation Controls
+
+The `Settings` sheet includes:
+- Cost contact name/email
+- Internal reservation-alert recipients
+- Assumption of Risk URL
+- Email automation on/off
+- Calendar automation on/off
+- Calendar ID
+- NYC FIRST website
+- Member Card URL
+- Staff Admin requirement
+- Activity sharing
+- Monthly outreach settings
+
+Automations remain disabled until the final Apps Script project has been connected, permissions approved, and the production Calendar / Assumption of Risk URL supplied.
+
+## Apps Script Deployment
+
+The repository still needs to be connected to the final Apps Script project before production deployment.
+
+1. Create or select the NYC FIRST Apps Script project.
+2. Replace `<DEV_PROJECT_ID>` in `.clasp.json` with the real Script ID.
+3. Build and upload:
    ```
-   npx clasp create --type standalone --title "D3 STEM Field Trips" --rootDir ./dist
-   ```
-   Or create the project in script.google.com and put its Script ID into `.clasp.json`.
-6. Run:
-   ```
+   npm install
    npm run build
    npm run upload
    ```
-7. In Apps Script open **Deploy → New deployment → Web app**.
-8. Set **Execute as** to the deploying account.
-9. Choose the access level appropriate for the program. For a public booking page, use the available public/anonymous option if organizational policy permits it; otherwise restrict to the intended Google Workspace audience.
-10. Authorize Sheets/Drive permissions.
-11. Copy the Web App URL. That becomes the booking link.
+4. Authorize the required Google scopes.
+5. Deploy as a Web App.
+6. Copy the production Web App URL into the `Public App URL` setting.
+7. Open `?view=staff` for the Staff Admin interface.
+8. Select the production Google Calendar and enter its Calendar ID.
+9. Enter the official Assumption of Risk URL.
+10. Enable email/calendar automations only after testing.
 
-## Can it be hosted on GitHub Pages?
+## OAuth / Permissions Used
 
-Yes, but not with this exact simplest architecture.
+The current manifest includes scopes for:
+- Google Sheets
+- Google Drive
+- Gmail sending
+- Calendar events
+- staff identity
+- Apps Script trigger creation
+- external requests
 
-GitHub Pages can host the HTML/CSS/JavaScript front end, but it cannot directly run Apps Script server functions such as `SpreadsheetApp`. You would need a separate backend/API and authentication/CORS design.
+## Important Launch Checks
 
-For this project, the simplest setup is:
+Before public launch:
+- Verify the final District 3 school list.
+- Verify the correct STEM/field-trip contact at each school.
+- Confirm official field-trip availability.
+- Confirm workshop grade bands, durations, capacities, and descriptions.
+- Add approved activity photos/videos.
+- Supply the official Assumption of Risk form URL.
+- Select the production field-trip Google Calendar.
+- Review all email/letter templates.
+- Test reservation submission, approval, duplicate-slot protection, confirmations, reminders, and attendance workflow.
+- Confirm NYC FIRST Google Workspace policy for public Web App access.
 
-**GitHub = code repository**
-→ **Google Apps Script Web App = live app**
-→ **Google Sheets = reservation database**
+## GitHub Role
 
-This keeps the first version inexpensive and easier to maintain.
+GitHub is the development and source-control layer, not the production database.
 
-## Data flow
-
-1. School user opens the Web App URL.
-2. `getAppData()` loads schools, contacts, workshops, and open dates.
-3. The user chooses a school, workshop, date, and time.
-4. The user enters contact/group details and completes the risk acknowledgement.
-5. `submitReservation()` checks that the slot is not already taken.
-6. A reservation ID is generated.
-7. A row is written to the `Reservations` sheet.
-8. Staff can update status, actual attendance, and follow-up information in the sheet.
-9. Future versions can automatically send confirmation emails, calendar invitations, reminders, risk-form links, and post-visit attendance requests.
-
-## Suggested next additions
-
-- Official workshop catalog and grade bands.
-- Official assumption-of-risk/consent form.
-- Real open dates tied to Google Calendar.
-- Real activity photos and video embeds.
-- Automatic email confirmation and reminders.
-- Staff admin dashboard.
-- Reservation cancel/reschedule links.
-- Capacity rules by activity.
-- Transportation/arrival instructions.
-- School-specific curriculum alignment notes.
-- Promotion/outreach status per school.
-- CRM-like contact history.
+**GitHub**
+→ **Google Apps Script public + staff web interfaces**
+→ **Google Sheets / Calendar / Gmail / Drive**
