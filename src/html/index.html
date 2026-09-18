@@ -1,35 +1,384 @@
 <!doctype html>
 <html lang="en">
-
 <head>
-  <title>Google Apps Script</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>D3 STEM Field Trips</title>
+  <style>
+    :root {
+      --ink:#14213d; --muted:#62708a; --paper:#f7f9fc; --card:#ffffff;
+      --accent:#ffb703; --accent2:#219ebc; --deep:#023047; --ok:#2a9d8f;
+      --line:#dbe3ee; --danger:#c44536; --shadow:0 18px 50px rgba(20,33,61,.10);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--paper);color:var(--ink)}
+    button,input,select,textarea{font:inherit}
+    button{cursor:pointer}
+    a{color:inherit}
+    .shell{max-width:1220px;margin:auto;padding:0 20px 64px}
+    .nav{position:sticky;top:0;z-index:20;background:rgba(247,249,252,.92);backdrop-filter:blur(12px);border-bottom:1px solid rgba(219,227,238,.7)}
+    .navin{max-width:1220px;margin:auto;padding:14px 20px;display:flex;align-items:center;gap:20px}
+    .brand{display:flex;align-items:center;gap:10px;font-weight:900;letter-spacing:-.02em}
+    .logo{width:40px;height:40px;border-radius:13px;background:var(--deep);display:grid;place-items:center;color:white;font-size:20px}
+    .navlinks{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+    .navlinks button{border:0;background:transparent;border-radius:10px;padding:9px 12px;color:var(--muted);font-weight:700}
+    .navlinks button:hover{background:white;color:var(--deep)}
+    .hero{padding:64px 0 28px;display:grid;grid-template-columns:1.15fr .85fr;gap:32px;align-items:center}
+    .eyebrow{display:inline-flex;gap:8px;align-items:center;padding:7px 11px;background:#e8f5f8;color:#12647a;border-radius:999px;font-weight:800;font-size:13px}
+    h1{font-size:clamp(42px,7vw,78px);line-height:.93;letter-spacing:-.065em;margin:18px 0 18px;max-width:760px}
+    .hero p{font-size:19px;line-height:1.6;color:var(--muted);max-width:720px}
+    .actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:24px}
+    .primary,.secondary{border:0;border-radius:14px;padding:14px 18px;font-weight:900}
+    .primary{background:var(--deep);color:white}
+    .secondary{background:white;color:var(--deep);border:1px solid var(--line)}
+    .heroart{background:linear-gradient(145deg,#073b4c,#219ebc);min-height:420px;border-radius:32px;position:relative;overflow:hidden;box-shadow:var(--shadow);padding:28px;color:white}
+    .orbit{position:absolute;border:2px solid rgba(255,255,255,.17);border-radius:50%}
+    .orbit.a{width:360px;height:360px;right:-110px;top:-80px}.orbit.b{width:270px;height:270px;left:-110px;bottom:-120px}
+    .artgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;position:relative;z-index:2;margin-top:70px}
+    .arttile{min-height:118px;border-radius:20px;background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.16);padding:16px;display:flex;flex-direction:column;justify-content:space-between}
+    .arttile b{font-size:14px}.emoji{font-size:40px}
+    section{padding:46px 0}
+    .sectionhead{display:flex;justify-content:space-between;gap:20px;align-items:end;margin-bottom:20px}
+    h2{font-size:clamp(30px,4vw,48px);letter-spacing:-.04em;margin:0 0 6px}
+    .sub{color:var(--muted);line-height:1.6;margin:0}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:22px;box-shadow:0 8px 30px rgba(20,33,61,.05);overflow:hidden}
+    .workshop{display:flex;flex-direction:column;min-height:360px}
+    .visual{height:145px;display:grid;place-items:center;font-size:68px;background:radial-gradient(circle at 25% 20%,#fff7d6,#dff4f8)}
+    .cardbody{padding:20px}
+    .pill{display:inline-block;border-radius:999px;background:#f0f4f8;padding:6px 9px;font-size:12px;font-weight:800;color:#526076;margin-bottom:10px}
+    .workshop h3{font-size:23px;letter-spacing:-.03em;margin:0 0 4px}
+    .workshop .subtitle{font-weight:750;color:var(--accent2);margin-bottom:11px}
+    .workshop p{color:var(--muted);line-height:1.55}
+    .workshop footer{margin-top:auto;padding:0 20px 20px;display:flex;justify-content:space-between;align-items:center}
+    .linkbtn{border:0;background:transparent;color:var(--deep);font-weight:900;padding:0}
+    .directory{display:grid;grid-template-columns:320px 1fr;gap:18px}
+    .filters,.listpanel{background:white;border:1px solid var(--line);border-radius:22px;padding:18px}
+    label{font-weight:800;font-size:13px;display:block;margin:12px 0 6px}
+    input,select,textarea{width:100%;border:1px solid var(--line);border-radius:12px;padding:12px;background:white;color:var(--ink)}
+    textarea{min-height:90px;resize:vertical}
+    .schoolrow{padding:14px 4px;border-bottom:1px solid var(--line);display:grid;grid-template-columns:1fr auto;gap:12px}
+    .schoolrow:last-child{border-bottom:0}.schoolrow h4{margin:0 0 5px}.schoolrow p{margin:0;color:var(--muted);font-size:14px;line-height:1.45}
+    .dbn{font-weight:900;color:#496179;font-size:12px}
+    .booking{display:grid;grid-template-columns:.8fr 1.2fr;gap:18px}
+    .stepper{background:var(--deep);color:white;border-radius:24px;padding:22px;align-self:start;position:sticky;top:82px}
+    .step{display:flex;gap:12px;padding:13px 0;opacity:.55}.step.active{opacity:1}.stepdone{opacity:.8}
+    .stepnum{width:29px;height:29px;border-radius:50%;background:rgba(255,255,255,.16);display:grid;place-items:center;font-size:13px;font-weight:900;flex:0 0 auto}
+    .bookingpanel{background:white;border:1px solid var(--line);border-radius:24px;padding:22px;min-height:540px}
+    .choicecards{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+    .choice{border:1px solid var(--line);border-radius:16px;padding:14px;background:white;text-align:left}
+    .choice.selected{border:2px solid var(--accent2);background:#f3fbfd}
+    .choice b{display:block;margin-bottom:4px}.choice small{color:var(--muted)}
+    .calendarhead{display:flex;justify-content:space-between;align-items:center;margin:18px 0 10px}
+    .calnav{border:1px solid var(--line);background:white;border-radius:10px;padding:8px 12px}
+    .calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:7px}
+    .dow{text-align:center;font-size:11px;font-weight:900;color:var(--muted);padding:7px}
+    .day{aspect-ratio:1;border:1px solid var(--line);border-radius:12px;background:#fafbfd;padding:6px;text-align:left;position:relative}
+    .day.open{background:white;border-color:#b7dce5}.day.open:hover{border-color:var(--accent2);transform:translateY(-1px)}.day.selected{background:var(--deep);color:white;border-color:var(--deep)}
+    .day.blank{border:0;background:transparent}.day:disabled{cursor:default;opacity:.38}.dot{width:6px;height:6px;border-radius:50%;background:var(--ok);position:absolute;bottom:7px;right:7px}
+    .times{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.time{border:1px solid var(--line);background:white;border-radius:999px;padding:9px 12px;font-weight:800}.time.selected{background:var(--accent);border-color:var(--accent)}
+    .formgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.full{grid-column:1/-1}
+    .risk{background:#fff9e8;border:1px solid #f2dda0;border-radius:16px;padding:14px;margin:16px 0}.risk p{color:#65552a;font-size:13px;line-height:1.55}
+    .check{display:flex;gap:10px;align-items:start}.check input{width:auto;margin-top:3px}
+    .summary{background:#eef7f9;border-radius:16px;padding:15px;margin-bottom:16px}.summary p{margin:4px 0;color:#365765}
+    .notice{padding:12px 14px;border-radius:12px;margin:12px 0;display:none}.notice.error{display:block;background:#fff0ee;color:#8f2d21}.notice.ok{display:block;background:#eaf8f4;color:#176855}
+    .contacttable{width:100%;border-collapse:collapse;font-size:14px}.contacttable th,.contacttable td{text-align:left;padding:11px 8px;border-bottom:1px solid var(--line);vertical-align:top}.contacttable th{font-size:12px;color:var(--muted)}
+    .curriculum{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.path{background:white;border:1px solid var(--line);border-radius:18px;padding:16px}.path h4{margin:0 0 8px}.path p{color:var(--muted);font-size:14px;line-height:1.5}
+    .modal{position:fixed;inset:0;background:rgba(2,48,71,.62);display:none;place-items:center;padding:20px;z-index:50}.modal.open{display:grid}.modalbox{background:white;border-radius:24px;max-width:700px;width:100%;max-height:86vh;overflow:auto;padding:24px;box-shadow:var(--shadow)}
+    .modalhead{display:flex;justify-content:space-between;gap:20px}.close{border:0;background:#eef2f6;border-radius:50%;width:36px;height:36px;font-weight:900}
+    .mediaDemo{display:grid;grid-template-columns:1.3fr .7fr;gap:12px;margin:18px 0}.fakevideo,.fakephoto{border-radius:18px;min-height:160px;display:grid;place-items:center;text-align:center;padding:20px}.fakevideo{background:#0b2940;color:white}.fakephoto{background:linear-gradient(135deg,#ffe7a3,#b9e8ef);font-size:50px}
+    .footnote{font-size:12px;color:var(--muted);margin-top:8px}
+    .hidden{display:none!important}
+    @media(max-width:900px){.hero,.directory,.booking{grid-template-columns:1fr}.grid{grid-template-columns:repeat(2,1fr)}.curriculum{grid-template-columns:repeat(2,1fr)}.stepper{position:static}.heroart{min-height:320px}}
+    @media(max-width:620px){.navlinks{display:none}.grid,.choicecards,.formgrid,.curriculum{grid-template-columns:1fr}.full{grid-column:auto}.hero{padding-top:38px}.heroart{min-height:290px}.calendar{gap:4px}.day{border-radius:8px}.contacttable{font-size:12px}.contacttable th:nth-child(4),.contacttable td:nth-child(4){display:none}}
+  </style>
 </head>
-
 <body>
-  <div class="container">
-    <div class="section">
-      <h4>Google Apps Script</h4>
-      <p>
-        Create Google add-ons and web applications with Google Apps Script and modern JavaScript with the starter kit.
-      </p>
-      <p>
-        The starter kit is used by <a href="https://digitalinspiration.com/">Digital Inspiration</a> for building
-        popular Google Workspace add-on including
-        <a href="https://workspace.google.com/marketplace/app/mail_merge_with_attachments/223404411203">Gmail Mail
-          Merge</a>
-        and <a href="https://workspace.google.com/marketplace/app/document_studio/429444628321">Document Studio</a>.
-      </p>
-      <p>
-        The modern development environment for building Google add-ons and web applications with Google Apps Script
-        and next-generation JavaScript. Uses Vite, Google Clasp and Eslint for an efficient workflow. For help, please
-        contact <a href="https://twitter.com/labnol">Amit Agarwal</a>
-        <small>amit@labnol.org</small>
-      </p>
+  <div class="nav">
+    <div class="navin">
+      <div class="brand"><div class="logo">⚙</div><span>D3 STEM Field Trips</span></div>
+      <div class="navlinks">
+        <button onclick="go('activities')">Activities</button>
+        <button onclick="go('book')">Book</button>
+        <button onclick="go('schools')">D3 Schools</button>
+        <button onclick="go('curriculum')">Curriculum</button>
+      </div>
     </div>
   </div>
-</body>
 
+  <main class="shell">
+    <section class="hero">
+      <div>
+        <div class="eyebrow">NYC FIRST · Washington Heights STEM Center · DEMO</div>
+        <h1>Turn a school day into a STEM mission.</h1>
+        <p>Explore hands-on field trips in robotics, coding, digital fabrication, environmental engineering, chemistry, sound, and physical computing—then choose an open date in a few clicks.</p>
+        <div class="actions">
+          <button class="primary" onclick="go('book')">Reserve a demo field trip</button>
+          <button class="secondary" onclick="go('activities')">Explore activities</button>
+        </div>
+      </div>
+      <div class="heroart" aria-label="Illustrated STEM activity collage">
+        <div class="orbit a"></div><div class="orbit b"></div>
+        <div class="artgrid">
+          <div class="arttile"><span class="emoji">🤖</span><b>Build & code robots</b></div>
+          <div class="arttile"><span class="emoji">☀️</span><b>Engineer clean energy</b></div>
+          <div class="arttile"><span class="emoji">🧊</span><b>Design & fabricate</b></div>
+          <div class="arttile"><span class="emoji">🔌</span><b>Connect sensors & circuits</b></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="activities">
+      <div class="sectionhead">
+        <div><h2>Choose the mission.</h2><p class="sub">Demo titles for now. Every card can later use your real photos, videos, age bands, and official descriptions.</p></div>
+      </div>
+      <div id="workshopGrid" class="grid"></div>
+    </section>
+
+    <section id="book">
+      <div class="sectionhead">
+        <div><h2>Book a field trip.</h2><p class="sub">Select the school, activity, date, and contact details. The live version writes the reservation to Google Sheets.</p></div>
+      </div>
+      <div class="booking">
+        <aside class="stepper">
+          <div class="step active" data-step="1"><div class="stepnum">1</div><div><b>School</b><br><small>Who is visiting?</small></div></div>
+          <div class="step" data-step="2"><div class="stepnum">2</div><div><b>Activity</b><br><small>What will students make?</small></div></div>
+          <div class="step" data-step="3"><div class="stepnum">3</div><div><b>Date & time</b><br><small>Pick an open slot.</small></div></div>
+          <div class="step" data-step="4"><div class="stepnum">4</div><div><b>Contact & confirmation</b><br><small>Finish the reservation.</small></div></div>
+        </aside>
+        <div class="bookingpanel">
+          <div id="bookingNotice" class="notice"></div>
+
+          <div class="bookstep" data-panel="1">
+            <h3>1. Select your District 3 school</h3>
+            <label for="schoolSearch">Search by school name or DBN</label>
+            <input id="schoolSearch" placeholder="Example: STEM Institute or 03M241" oninput="renderSchoolChoices()">
+            <div id="schoolChoices" class="choicecards" style="margin-top:14px"></div>
+          </div>
+
+          <div class="bookstep hidden" data-panel="2">
+            <h3>2. Choose a STEM activity</h3>
+            <div id="bookingWorkshops" class="choicecards"></div>
+            <div class="actions"><button class="secondary" onclick="setStep(1)">Back</button><button class="primary" onclick="nextFromWorkshop()">Continue</button></div>
+          </div>
+
+          <div class="bookstep hidden" data-panel="3">
+            <h3>3. Pick an open date</h3>
+            <div class="calendarhead"><button class="calnav" onclick="changeMonth(-1)">←</button><b id="monthLabel"></b><button class="calnav" onclick="changeMonth(1)">→</button></div>
+            <div id="calendar" class="calendar"></div>
+            <div id="times" class="times"></div>
+            <div class="actions"><button class="secondary" onclick="setStep(2)">Back</button><button class="primary" onclick="nextFromDate()">Continue</button></div>
+          </div>
+
+          <div class="bookstep hidden" data-panel="4">
+            <h3>4. Contact, group & confirmation</h3>
+            <div id="bookingSummary" class="summary"></div>
+            <div class="formgrid">
+              <div><label>Contact name</label><input id="contactName"></div>
+              <div><label>Email</label><input id="contactEmail" type="email"></div>
+              <div><label>Phone</label><input id="contactPhone"></div>
+              <div><label>Grade(s)</label><input id="grades" placeholder="Example: 6–8"></div>
+              <div><label>Expected students</label><input id="expectedStudents" type="number" min="1" max="60" value="25"></div>
+              <div><label>Adults / chaperones</label><input id="adults" type="number" min="0" max="20" value="3"></div>
+              <div class="full"><label>Accessibility / learning needs</label><textarea id="accessibility" placeholder="Tell us what will help your students participate fully."></textarea></div>
+              <div class="full"><label>Notes</label><textarea id="notes" placeholder="Transportation timing, curriculum connection, special requests…"></textarea></div>
+            </div>
+            <div class="risk">
+              <b>Demo assumption-of-risk acknowledgement</b>
+              <p>This is only a placeholder workflow for the prototype. Tomorrow, replace this text with the official NYC FIRST / partner form and required consent language.</p>
+              <label>Authorized signer name</label><input id="riskSigner">
+              <div class="check" style="margin-top:10px"><input id="riskAcknowledged" type="checkbox"><span>I acknowledge that the official assumption-of-risk / consent form will be required before participation.</span></div>
+            </div>
+            <div class="actions"><button class="secondary" onclick="setStep(3)">Back</button><button class="primary" id="submitBtn" onclick="submitBooking()">Submit reservation</button></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="schools">
+      <div class="sectionhead">
+        <div><h2>District 3 school directory.</h2><p class="sub">Built as an outreach workspace. Public contact details are for communication planning; confirm the correct field-trip/STEM coordinator before outreach.</p></div>
+        <div id="schoolCount" class="pill"></div>
+      </div>
+      <div class="directory">
+        <div class="filters">
+          <label>Search</label><input id="directorySearch" placeholder="School, DBN, neighborhood…" oninput="renderDirectory()">
+          <label>School type</label>
+          <select id="typeFilter" onchange="renderDirectory()"><option value="">All types</option><option>District - Zoned</option><option>District - Choice</option><option>Charter</option></select>
+          <label>Contact coverage</label>
+          <select id="contactFilter" onchange="renderDirectory()"><option value="">All schools</option><option value="yes">Public outreach contact found</option><option value="no">Contact research pending</option></select>
+          <p class="footnote">Demo directory assembled from current public NYCPS information and District 3 lists. You can replace it with your official list later.</p>
+        </div>
+        <div id="directoryList" class="listpanel"></div>
+      </div>
+    </section>
+
+    <section id="contacts">
+      <div class="sectionhead"><div><h2>Outreach contacts.</h2><p class="sub">District leadership plus public school contacts already researched for the demo.</p></div></div>
+      <div class="listpanel" style="overflow:auto"><table class="contacttable"><thead><tr><th>School</th><th>Contact</th><th>Role</th><th>Email / phone</th></tr></thead><tbody id="contactsBody"></tbody></table></div>
+    </section>
+
+    <section id="curriculum">
+      <div class="sectionhead"><div><h2>Built to connect with the school year.</h2><p class="sub">The catalog can be mapped to scope & sequence, learning objectives, grade bands, and standards instead of being a collection of disconnected one-off activities.</p></div></div>
+      <div class="curriculum">
+        <div class="path"><h4>🤖 Robotics & FLL</h4><p>Mechanisms → sensors → block coding → autonomous challenges → engineering documentation.</p></div>
+        <div class="path"><h4>🧊 Design & Fabrication</h4><p>Sketching → CAD → 3D printing → vector design → laser cutting → prototype evaluation.</p></div>
+        <div class="path"><h4>🌎 Environmental Engineering</h4><p>Energy systems → solar testing → environmental sensing → data → community infrastructure proposals.</p></div>
+        <div class="path"><h4>💻 Coding</h4><p>Algorithms → events → loops → variables → debugging → robotics and physical computing.</p></div>
+        <div class="path"><h4>🔌 Physical Computing</h4><p>Circuits → sensors → actuators → Arduino-style logic → responsive prototypes.</p></div>
+        <div class="path"><h4>🧪 Chemistry Engineering</h4><p>Matter → reactions → variables → measurement → process improvement and safe testing.</p></div>
+        <div class="path"><h4>🎛 Sound Engineering</h4><p>Waves → frequency → electronics → speakers/microphones → sound effects and digital audio.</p></div>
+        <div class="path"><h4>📐 Standards Mapping</h4><p>Demo fields are ready for NYSP12SLS, NYS Computer Science & Digital Fluency, math, arts, and your official curriculum standards.</p></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="workshopModal" class="modal" onclick="modalOutside(event)">
+    <div class="modalbox">
+      <div class="modalhead"><div><span id="modalIcon" style="font-size:44px"></span><h2 id="modalTitle" style="font-size:36px"></h2><p id="modalSubtitle" class="sub"></p></div><button class="close" onclick="closeModal()">×</button></div>
+      <div class="mediaDemo"><div class="fakevideo"><div><div style="font-size:48px">▶</div><b>Activity video placeholder</b><br><small>Replace with your real workshop video.</small></div></div><div id="modalPhoto" class="fakephoto">🤖</div></div>
+      <p id="modalDescription" class="sub"></p>
+      <h3>Students will…</h3><ul id="modalObjectives"></ul>
+      <h3>Curriculum & standards</h3><ul id="modalStandards"></ul>
+      <div class="actions"><button class="primary" onclick="bookFromModal()">Book this activity</button><button class="secondary" onclick="closeModal()">Keep exploring</button></div>
+    </div>
+  </div>
+
+<script>
+  const state = {data:null, schoolId:null, workshopId:null, date:null, time:null, step:1, calendarMonth:null, modalWorkshop:null};
+
+  function boot(){
+    google.script.run
+      .withSuccessHandler(data => {
+        state.data = data;
+        const first = data.availability && data.availability[0] ? new Date(data.availability[0].date + 'T12:00:00') : new Date();
+        state.calendarMonth = new Date(first.getFullYear(), first.getMonth(), 1);
+        renderWorkshops(); renderSchoolChoices(); renderDirectory(); renderContacts(); renderCalendar();
+      })
+      .withFailureHandler(err => showNotice(err.message || String(err), 'error'))
+      .getAppData();
+  }
+
+  function go(id){ document.getElementById(id).scrollIntoView({behavior:'smooth',block:'start'}); }
+  function esc(v){ return String(v ?? '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[s])); }
+
+  function renderWorkshops(){
+    const grid = document.getElementById('workshopGrid');
+    grid.innerHTML = state.data.workshops.map(w => `
+      <article class="card workshop">
+        <div class="visual">${w.icon}</div>
+        <div class="cardbody"><span class="pill">${esc(w.ages)} · ${esc(w.duration)}</span><h3>${esc(w.title)}</h3><div class="subtitle">${esc(w.subtitle)}</div><p>${esc(w.description)}</p></div>
+        <footer><span class="dbn">Up to ${w.capacity} students</span><button class="linkbtn" onclick="openWorkshop('${w.id}')">See activity →</button></footer>
+      </article>`).join('');
+    document.getElementById('bookingWorkshops').innerHTML = state.data.workshops.map(w => `
+      <button class="choice ${state.workshopId===w.id?'selected':''}" onclick="selectWorkshop('${w.id}')"><span style="font-size:28px">${w.icon}</span><b>${esc(w.title)}</b><small>${esc(w.ages)} · ${esc(w.duration)}</small></button>`).join('');
+  }
+
+  function openWorkshop(id){
+    const w = state.data.workshops.find(x=>x.id===id); if(!w)return;
+    state.modalWorkshop=id;
+    document.getElementById('modalIcon').textContent=w.icon;
+    document.getElementById('modalPhoto').textContent=w.icon;
+    document.getElementById('modalTitle').textContent=w.title;
+    document.getElementById('modalSubtitle').textContent=w.subtitle+' · '+w.ages+' · '+w.duration;
+    document.getElementById('modalDescription').textContent=w.description;
+    document.getElementById('modalObjectives').innerHTML=w.objectives.map(x=>'<li>'+esc(x)+'</li>').join('');
+    document.getElementById('modalStandards').innerHTML=w.standards.map(x=>'<li>'+esc(x)+'</li>').join('');
+    document.getElementById('workshopModal').classList.add('open');
+  }
+  function closeModal(){document.getElementById('workshopModal').classList.remove('open')}
+  function modalOutside(e){if(e.target.id==='workshopModal')closeModal()}
+  function bookFromModal(){state.workshopId=state.modalWorkshop;closeModal();renderWorkshops();setStep(1);go('book')}
+
+  function renderSchoolChoices(){
+    if(!state.data)return;
+    const q=(document.getElementById('schoolSearch').value||'').toLowerCase();
+    const rows=state.data.schools.filter(s=>!q||[s.name,s.id,s.address].join(' ').toLowerCase().includes(q)).slice(0,12);
+    document.getElementById('schoolChoices').innerHTML=rows.map(s=>`
+      <button class="choice ${state.schoolId===s.id?'selected':''}" onclick="selectSchool('${s.id}')"><b>${esc(s.name)}</b><small>${esc(s.id)} · ${esc(s.grades)}</small></button>`).join('');
+  }
+  function selectSchool(id){state.schoolId=id;renderSchoolChoices();setTimeout(()=>setStep(2),180)}
+  function selectWorkshop(id){state.workshopId=id;renderWorkshops()}
+  function nextFromWorkshop(){if(!state.workshopId)return showNotice('Choose an activity first.','error');setStep(3)}
+  function nextFromDate(){if(!state.date||!state.time)return showNotice('Choose an open date and time.','error');renderBookingSummary();setStep(4)}
+
+  function setStep(n){
+    state.step=n; clearNotice();
+    document.querySelectorAll('.bookstep').forEach(el=>el.classList.toggle('hidden',Number(el.dataset.panel)!==n));
+    document.querySelectorAll('.step').forEach(el=>{const x=Number(el.dataset.step);el.classList.toggle('active',x===n);el.classList.toggle('stepdone',x<n)});
+    if(n===3)renderCalendar(); if(n===4)renderBookingSummary();
+  }
+
+  function availabilityMap(){const m={};(state.data.availability||[]).forEach(d=>m[d.date]=d.times);return m}
+  function ymd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+  function renderCalendar(){
+    if(!state.data||!state.calendarMonth)return;
+    const m=state.calendarMonth, year=m.getFullYear(), month=m.getMonth();
+    document.getElementById('monthLabel').textContent=m.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+    const map=availabilityMap(), first=new Date(year,month,1), last=new Date(year,month+1,0);
+    let html=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(x=>'<div class="dow">'+x+'</div>').join('');
+    for(let i=0;i<first.getDay();i++)html+='<div class="day blank"></div>';
+    for(let d=1;d<=last.getDate();d++){
+      const date=new Date(year,month,d), key=ymd(date), open=Boolean(map[key]), selected=state.date===key;
+      html+=`<button class="day ${open?'open':''} ${selected?'selected':''}" ${open?'':'disabled'} onclick="chooseDate('${key}')"><b>${d}</b>${open?'<span class="dot"></span>':''}</button>`;
+    }
+    document.getElementById('calendar').innerHTML=html;
+    renderTimes();
+  }
+  function changeMonth(delta){state.calendarMonth=new Date(state.calendarMonth.getFullYear(),state.calendarMonth.getMonth()+delta,1);renderCalendar()}
+  function chooseDate(date){state.date=date;state.time=null;renderCalendar()}
+  function renderTimes(){
+    const holder=document.getElementById('times');if(!state.date){holder.innerHTML='<span class="sub">Choose an open date to see times.</span>';return}
+    const map=availabilityMap(); holder.innerHTML=(map[state.date]||[]).map(t=>`<button class="time ${state.time===t?'selected':''}" onclick="chooseTime('${t}')">${t}</button>`).join('');
+  }
+  function chooseTime(t){state.time=t;renderTimes()}
+
+  function renderBookingSummary(){
+    if(!state.data)return;
+    const school=state.data.schools.find(x=>x.id===state.schoolId), workshop=state.data.workshops.find(x=>x.id===state.workshopId);
+    document.getElementById('bookingSummary').innerHTML=`<b>${esc(school?.name||'')}</b><p>${esc(workshop?.title||'')} · ${esc(state.date||'')} · ${esc(state.time||'')}</p>`;
+  }
+
+  function submitBooking(){
+    const payload={
+      schoolId:state.schoolId,workshopId:state.workshopId,date:state.date,time:state.time,
+      contactName:val('contactName'),contactEmail:val('contactEmail'),contactPhone:val('contactPhone'),grades:val('grades'),
+      expectedStudents:val('expectedStudents'),adults:val('adults'),accessibility:val('accessibility'),notes:val('notes'),
+      riskSigner:val('riskSigner'),riskAcknowledged:document.getElementById('riskAcknowledged').checked
+    };
+    const btn=document.getElementById('submitBtn');btn.disabled=true;btn.textContent='Saving…';clearNotice();
+    google.script.run.withSuccessHandler(result=>{
+      btn.disabled=false;btn.textContent='Submit reservation';
+      showNotice('Reservation '+result.reservationId+' saved. Status: '+result.status+'.', 'ok');
+      document.getElementById('bookingSummary').innerHTML=`<b>Reservation received ✓</b><p>ID: ${esc(result.reservationId)}</p><p>${esc(result.school)} · ${esc(result.workshop)} · ${esc(result.date)} · ${esc(result.time)}</p><p>This demo records the request in Google Sheets for staff follow-up.</p>`;
+    }).withFailureHandler(err=>{btn.disabled=false;btn.textContent='Submit reservation';showNotice(err.message||String(err),'error')}).submitReservation(payload);
+  }
+  function val(id){return document.getElementById(id).value.trim()}
+  function showNotice(msg,type){const n=document.getElementById('bookingNotice');n.className='notice '+type;n.textContent=msg}
+  function clearNotice(){const n=document.getElementById('bookingNotice');n.className='notice';n.textContent=''}
+
+  function contactsBySchool(){const m={};state.data.contacts.forEach(c=>{if(!m[c.schoolId])m[c.schoolId]=[];m[c.schoolId].push(c)});return m}
+  function renderDirectory(){
+    if(!state.data)return;
+    const q=(document.getElementById('directorySearch').value||'').toLowerCase(), type=document.getElementById('typeFilter').value, cf=document.getElementById('contactFilter').value, cmap=contactsBySchool();
+    const rows=state.data.schools.filter(s=>{
+      const found=!q||[s.name,s.id,s.address,s.grades].join(' ').toLowerCase().includes(q);
+      const typed=!type||s.type===type; const has=Boolean(cmap[s.id]?.length); const contactOK=!cf||(cf==='yes'?has:!has);
+      return found&&typed&&contactOK;
+    });
+    document.getElementById('schoolCount').textContent=rows.length+' schools shown';
+    document.getElementById('directoryList').innerHTML=rows.map(s=>{
+      const c=(cmap[s.id]||[])[0];
+      return `<div class="schoolrow"><div><div class="dbn">${esc(s.id)} · ${esc(s.type)}</div><h4>${esc(s.name)}</h4><p>${esc(s.address)} · Grades ${esc(s.grades)}</p>${c?`<p style="margin-top:6px"><b>Outreach:</b> ${esc(c.name)} · ${esc(c.role)} · ${esc(c.email)}</p>`:'<p style="margin-top:6px"><b>Outreach:</b> contact research pending</p>'}</div><button class="secondary" onclick="chooseDirectorySchool('${s.id}')">Book</button></div>`;
+    }).join('')||'<p class="sub">No schools match these filters.</p>';
+  }
+  function chooseDirectorySchool(id){state.schoolId=id;renderSchoolChoices();setStep(2);go('book')}
+  function renderContacts(){
+    const rows=state.data.contacts||[];
+    document.getElementById('contactsBody').innerHTML=rows.map(c=>`<tr><td><b>${esc(c.school)}</b></td><td>${esc(c.name)}</td><td>${esc(c.role)}</td><td><a href="mailto:${esc(c.email)}">${esc(c.email)}</a>${c.phone?'<br>'+esc(c.phone):''}</td></tr>`).join('');
+  }
+  window.addEventListener('load',boot);
+</script>
+</body>
 </html>
