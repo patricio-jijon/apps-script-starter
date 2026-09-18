@@ -6,7 +6,12 @@ import {
   getAvailability,
   getDatabaseInfo,
   getStaffAdminData,
+  saveSetting,
   saveStaffRecord,
+  approveReservation,
+  sendReservationReminder,
+  installD3AutomationTriggers,
+  runD3DailyAutomation,
   submitReservation,
 } from './server/fieldTrips.js';
 
@@ -18,7 +23,12 @@ export {
   getDatabaseInfo,
   getStaffAdminData,
   getGmailAliases,
+  installD3AutomationTriggers,
   makeQueryString,
+  runD3DailyAutomation,
+  saveSetting,
   saveStaffRecord,
+  sendReservationReminder,
+  approveReservation,
   submitReservation,
 };
