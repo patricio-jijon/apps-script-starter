@@ -41,6 +41,7 @@
           <div class="card"><div class="metric" id="mOpenDates">0</div><b>Open Time Slots</b></div>
           <div class="card"><div class="metric" id="mContacts">0</div><b>School Contacts</b></div>
         </div>
+        <div id="launchReadiness"></div>
         <div class="panel"><h2>Automation checklist</h2><p class="muted">Booking alerts: Patricio, Mariana, and Katiuska · Calendar automation: controlled in Settings · Risk form link: controlled in Settings · Monthly outreach: managed through Email Campaigns and Email Templates.</p></div>
       </section>
       <section id="workshops" class="view hidden"></section>
@@ -90,6 +91,7 @@ function render(){
   document.getElementById('mWorkshops').textContent=d.workshops.length;
   document.getElementById('mOpenDates').textContent=d.availability.filter(x=>String(x.Status).toUpperCase()==='OPEN').length;
   document.getElementById('mContacts').textContent=d.contacts.length;
+  document.getElementById('launchReadiness').innerHTML=renderLaunchReadiness(d.launchReadiness||{});
 
   document.getElementById('analytics').innerHTML=renderAnalytics(d.analytics||{});
   document.getElementById('map').innerHTML=renderSchoolMap(d.analytics||{});
@@ -184,6 +186,11 @@ function render(){
     table('Attendance',d.attendance,['Reservation ID','School','Workshop','Date','Expected Students','Actual Students','Adults / Chaperones','Completed By']);
 
   document.getElementById('settings').innerHTML=settingsEditor(d.settings);
+}
+function renderLaunchReadiness(r){
+  const checks=r.checks||[];
+  const rows=checks.map(x=>'<div style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)"><span>'+esc(x.label)+'</span><b style="color:'+(x.ready?'#176855':'#8f2d21')+'">'+(x.ready?'Ready':'Pending')+'</b></div>').join('');
+  return '<div class="panel"><h2>Launch Readiness · '+esc(r.percent||0)+'%</h2><p class="muted">'+esc(r.completed||0)+' of '+esc(r.total||0)+' launch checks are complete.</p>'+rows+'<div class="toolbar"><span class="pill">Email automation: '+(r.emailAutomationsEnabled?'ON':'OFF')+'</span><span class="pill">Calendar automation: '+(r.calendarAutomationsEnabled?'ON':'OFF')+'</span></div></div>';
 }
 function renderAnalytics(a){
   const t=a.totals||{};
