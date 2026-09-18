@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>NYC FIRST · D3 Field Trips Staff</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700;800;900&display=swap');
+    :root{--tory:#154593;--endeavour:#0065B3;--cerulean:#009CD6;--red:#ED1C24;--ink:#010101;--gray:#626262;--line:#dbe3ee;--paper:#f6f8fb}
+    *{box-sizing:border-box}body{margin:0;font-family:"Work Sans",Arial,sans-serif;background:var(--paper);color:var(--ink)}
+    button,input,textarea,select{font:inherit}.top{background:var(--tory);color:#fff;padding:18px 24px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:10}
+    .logo{font-weight:900;font-size:22px}.top small{opacity:.8}.top .who{margin-left:auto;text-align:right}
+    .layout{display:grid;grid-template-columns:240px 1fr;min-height:calc(100vh - 76px)}aside{background:#fff;border-right:1px solid var(--line);padding:18px}
+    nav button{width:100%;border:0;background:transparent;text-align:left;padding:11px 12px;border-radius:10px;font-weight:700;color:var(--gray);margin-bottom:5px}
+    nav button.active,nav button:hover{background:#eaf5fb;color:var(--tory)}main{padding:24px;max-width:1500px}.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+    .card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px}.metric{font-size:32px;font-weight:900;color:var(--tory)}h1{margin:0 0 4px}h2{margin-top:0}
+    .panel{background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px;margin-bottom:20px}.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+    input,textarea,select{border:1px solid var(--line);border-radius:10px;padding:10px;width:100%}.btn{border:0;border-radius:10px;padding:10px 13px;font-weight:800;cursor:pointer}.primary{background:var(--tory);color:#fff}.secondary{background:#fff;border:1px solid var(--line);color:var(--tory)}
+    table{border-collapse:collapse;width:100%;font-size:13px}th,td{border-bottom:1px solid var(--line);padding:10px;text-align:left;vertical-align:top}th{background:#f4f7fb;color:var(--tory);position:sticky;top:76px}
+    .scroll{overflow:auto;max-height:64vh}.hidden{display:none}.notice{padding:11px 13px;border-radius:10px;margin:10px 0}.ok{background:#e8f7f2;color:#176855}.err{background:#fff0ee;color:#8f2d21}
+    .formgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.full{grid-column:1/-1}.muted{color:var(--gray);font-size:13px;line-height:1.5}
+    @media(max-width:900px){.layout{grid-template-columns:1fr}aside{border-right:0;border-bottom:1px solid var(--line)}nav{display:flex;gap:6px;overflow:auto}.cards{grid-template-columns:repeat(2,1fr)}.formgrid{grid-template-columns:1fr}.full{grid-column:auto}}
+  </style>
+</head>
+<body>
+  <header class="top"><div class="logo">NYC FIRST</div><div><b>D3 School Field Trips · Staff Admin</b><br><small>Washington Heights STEM Center</small></div><div class="who"><small>Signed in as</small><br><b id="staffEmail">Checking…</b></div></header>
+  <div class="layout">
+    <aside><nav id="nav"></nav></aside>
+    <main>
+      <div id="notice"></div>
+      <section id="dashboard" class="view">
+        <h1>Field Trip Operations</h1><p class="muted">Use this dashboard to manage the content and operations behind the public booking app.</p>
+        <div class="cards">
+          <div class="card"><div class="metric" id="mReservations">0</div><b>Reservations</b></div>
+          <div class="card"><div class="metric" id="mWorkshops">0</div><b>Activities</b></div>
+          <div class="card"><div class="metric" id="mOpenDates">0</div><b>Open Time Slots</b></div>
+          <div class="card"><div class="metric" id="mContacts">0</div><b>School Contacts</b></div>
+        </div>
+        <div class="panel"><h2>Automation checklist</h2><p class="muted">Booking alerts: Patricio, Mariana, and Katiuska · Calendar automation: controlled in Settings · Risk form link: controlled in Settings · Monthly outreach: managed through Email Campaigns and Email Templates.</p></div>
+      </section>
+      <section id="workshops" class="view hidden"></section>
+      <section id="availability" class="view hidden"></section>
+      <section id="contacts" class="view hidden"></section>
+      <section id="templates" class="view hidden"></section>
+      <section id="campaigns" class="view hidden"></section>
+      <section id="media" class="view hidden"></section>
+      <section id="risk" class="view hidden"></section>
+      <section id="attendance" class="view hidden"></section>
+      <section id="reservations" class="view hidden"></section>
+      <section id="settings" class="view hidden"></section>
+    </main>
+  </div>
+<script>
+const state={data:null};
+const sections=[
+  ['dashboard','Dashboard'],['reservations','Reservations'],['workshops','Activities'],
+  ['availability','Calendar / Availability'],['contacts','D3 Schools & Teachers'],
+  ['templates','Letters / Templates'],['campaigns','Communications / Campaigns'],
+  ['media','Images & Media'],['risk','Assumption of Risk'],['attendance','Attendance'],['settings','Settings']
+];
+function esc(v){return String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[s]))}
+function initNav(){document.getElementById('nav').innerHTML=sections.map(([id,label],i=>i))}
+function buildNav(){
+  document.getElementById('nav').innerHTML=sections.map(([id,label],i)=>'<button class="'+(i===0?'active':'')+'" onclick="showView(\''+id+'\',this)">'+esc(label)+'</button>').join('');
+}
+function showView(id,btn){document.querySelectorAll('.view').forEach(x=>x.classList.add('hidden'));document.getElementById(id).classList.remove('hidden');document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));if(btn)btn.classList.add('active')}
+function table(title,rows,columns){
+  const cols=columns||Object.keys(rows[0]||{});
+  return '<div class="panel"><h2>'+esc(title)+'</h2><div class="scroll"><table><thead><tr>'+cols.map(c=>'<th>'+esc(c)+'</th>').join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+cols.map(c=>'<td>'+esc(r[c])+'</td>').join('')+'</tr>').join('')+'</tbody></table></div></div>';
+}
+function render(){
+  const d=state.data;
+  document.getElementById('staffEmail').textContent=d.staffEmail||'Authorized staff';
+  document.getElementById('mReservations').textContent=d.reservations.length;
+  document.getElementById('mWorkshops').textContent=d.workshops.length;
+  document.getElementById('mOpenDates').textContent=d.availability.filter(x=>String(x.Status).toUpperCase()==='OPEN').length;
+  document.getElementById('mContacts').textContent=d.contacts.length;
+  document.getElementById('reservations').innerHTML=table('Reservations',d.reservations,['Reservation ID','Status','School Name','Contact Name','Contact Email','Workshop Title','Date','Start Time','Expected Students','Actual Students','Risk Form Status','Staff Approval']);
+  document.getElementById('workshops').innerHTML=editorIntro('Activities','Manage public titles, descriptions, grade bands, capacity, media links, learning objectives, standards, and publication status.')+table('Activity Library',d.workshops,['Workshop ID','Public Title','Category','Description','Publication Status','Age / Grade Band','Duration','Capacity','Photo / Media','Video URL']);
+  document.getElementById('availability').innerHTML=editorIntro('Calendar / Availability','Control which dates and times appear as open on the public booking calendar. Confirmed reservations can also create Google Calendar events when automation is enabled.')+table('Availability',d.availability,['Date','Start Time','End Time','Status','Workshop Restrictions','Capacity / School Slots','Calendar Event ID']);
+  document.getElementById('contacts').innerHTML=editorIntro('D3 Schools & STEM Contacts','Maintain teachers, parent coordinators, STEM leads, email addresses, outreach status, and communication notes.')+table('Outreach Contacts',d.contacts,['School ID / DBN','School','Contact Name','Role','Email','Phone','Outreach Status','Last Contacted','Notes']);
+  document.getElementById('templates').innerHTML=editorIntro('Letters / Templates','Manage confirmation letters, invitation letters, monthly promotion emails, reminders, and other communication copy.')+table('Email & Letter Templates',d.templates,['Template ID','Template Name','Type','Subject','Body / Message','Active','Last Updated']);
+  document.getElementById('campaigns').innerHTML=editorIntro('Communications / Campaigns','Plan monthly promotions and targeted outreach to District 3 schools.')+table('Email Campaigns',d.campaigns,['Campaign ID','Campaign Name','Month','Audience','Subject','Template ID','Scheduled Date','Sent Date','Status','Recipients']);
+  document.getElementById('media').innerHTML=editorIntro('Images & Media','Attach activity photos, videos, captions, and public/private status for the public site.')+table('Media Library',d.media,['Media ID','Workshop ID','Title','Type','Drive File / URL','Alt Text / Caption','Public','Updated']);
+  document.getElementById('risk').innerHTML=editorIntro('Assumption of Risk','Track when risk-form links are sent, signed, received, stored, and verified.')+table('Risk Forms',d.riskForms,['Reservation ID','School','Field Trip Date','Participant / Form Reference','Guardian / Signer','Sent Date','Signed Date','Status','Drive File / Folder','Staff Verified']);
+  document.getElementById('attendance').innerHTML=editorIntro('Attendance','Record expected and actual student attendance after each field trip.')+table('Attendance',d.attendance,['Reservation ID','School','Workshop','Date','Expected Students','Actual Students','Adults / Chaperones','Completed By']);
+  document.getElementById('settings').innerHTML='<div class="panel"><h2>System Settings</h2><div class="scroll"><table><thead><tr><th>Setting</th><th>Value</th></tr></thead><tbody>'+Object.entries(d.settings).map(([k,v])=>'<tr><td><b>'+esc(k)+'</b></td><td>'+esc(v)+'</td></tr>').join('')+'</tbody></table></div></div>';
+}
+function editorIntro(title,text){return '<div class="panel"><h1>'+esc(title)+'</h1><p class="muted">'+esc(text)+'</p><p class="muted"><b>Current phase:</b> live data view and backend editing functions are connected; dedicated add/edit forms will be layered onto this interface.</p></div>'}
+function load(){
+  buildNav();
+  google.script.run.withSuccessHandler(d=>{state.data=d;render();}).withFailureHandler(e=>{document.getElementById('notice').innerHTML='<div class="notice err">'+esc(e.message||e)+'</div>';}).getStaffAdminData();
+}
+window.addEventListener('load',load);
+</script>
+</body></html>
