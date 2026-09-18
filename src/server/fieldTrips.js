@@ -189,6 +189,21 @@ function getObjects_(ss, sheetName) {
   });
 }
 
+function serializeRows_(rows) {
+  return rows.map((row) => serializeObject_(row));
+}
+
+function serializeObject_(obj) {
+  const out = {};
+  Object.keys(obj || {}).forEach((key) => {
+    const value = obj[key];
+    out[key] = value instanceof Date
+      ? Utilities.formatDate(value, APP_TIMEZONE, 'yyyy-MM-dd')
+      : value;
+  });
+  return out;
+}
+
 function splitPipe_(value) {
   const text = String(value || '').trim();
   if (!text || text.toLowerCase().includes('tbd') || text.toLowerCase().includes('to be aligned')) return [];
@@ -335,19 +350,19 @@ export const getStaffAdminData = () => {
   verifyStaff_();
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   return {
-    reservations: getObjects_(ss, 'Reservations'),
-    schools: getObjects_(ss, 'D3 Schools'),
-    workshops: getObjects_(ss, 'Workshops'),
-    equipment: getObjects_(ss, 'Equipment'),
-    availability: getObjects_(ss, 'Availability'),
-    contacts: getObjects_(ss, 'Outreach Contacts'),
-    campaigns: getObjects_(ss, 'Email Campaigns'),
-    templates: getObjects_(ss, 'Email Templates'),
-    media: getObjects_(ss, 'Media Library'),
-    riskForms: getObjects_(ss, 'Risk Forms'),
-    attendance: getObjects_(ss, 'Attendance'),
+    reservations: serializeRows_(getObjects_(ss, 'Reservations')),
+    schools: serializeRows_(getObjects_(ss, 'D3 Schools')),
+    workshops: serializeRows_(getObjects_(ss, 'Workshops')),
+    equipment: serializeRows_(getObjects_(ss, 'Equipment')),
+    availability: serializeRows_(getObjects_(ss, 'Availability')),
+    contacts: serializeRows_(getObjects_(ss, 'Outreach Contacts')),
+    campaigns: serializeRows_(getObjects_(ss, 'Email Campaigns')),
+    templates: serializeRows_(getObjects_(ss, 'Email Templates')),
+    media: serializeRows_(getObjects_(ss, 'Media Library')),
+    riskForms: serializeRows_(getObjects_(ss, 'Risk Forms')),
+    attendance: serializeRows_(getObjects_(ss, 'Attendance')),
     analytics: buildStaffAnalytics_(ss),
-    settings: getSettings_(),
+    settings: serializeObject_(getSettings_()),
     staffEmail: Session.getActiveUser().getEmail(),
   };
 };
@@ -627,7 +642,18 @@ export const approveReservation = (reservationId) => {
   const calendarEventId = createConfirmedCalendarEvent_(payload, reservationId, schoolName, workshopTitle, endTime);
   confirmAvailabilitySlot_(ss.getSheetByName('Availability'), payload.date, payload.time, calendarEventId);
   const confirmationSent = sendConfirmedReservationEmail_(payload, reservationId, schoolName, workshopTitle, endTime);
+  const riskSent = upsertRiskFormRecord_(ss, {
+    reservationId,
+    schoolName,
+    fieldTripDate: payload.date,
+    signerName: String(get('Contact Name') || ''),
+    email: String(get('Contact Email') || ''),
+  });
 
+  const riskStatusCol = headers.indexOf('Risk Form Status') + 1;
+  const riskLinkCol = headers.indexOf('Risk Form Folder / Link') + 1;
+  if (riskStatusCol > 0 && riskSent.sent) sheet.getRange(rowNumber, riskStatusCol).setValue('SENT');
+  if (riskLinkCol > 0 && riskSent.url) sheet.getRange(rowNumber, riskLinkCol).setValue(riskSent.url);
   if (confirmationCol > 0) sheet.getRange(rowNumber, confirmationCol).setValue(confirmationSent ? 'YES' : 'NO');
   return {ok: true, reservationId, status: 'CONFIRMED', confirmationSent, calendarEventId: calendarEventId || ''};
 };
@@ -727,6 +753,46 @@ export const runD3DailyAutomation = () => {
   }
   return {ok: true, sent};
 };
+
+function upsertRiskFormRecord_(ss, details) {
+  const settings = getSettings_();
+  const riskUrl = String(settings['Risk Form URL'] || '').trim();
+  if (!riskUrl || riskUrl === 'TBD') return {sent: false, url: ''};
+
+  const sheet = ss.getSheetByName('Risk Forms');
+  if (!sheet) return {sent: false, url: riskUrl};
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0].map((h) => String(h || '').trim());
+  const idIndex = headers.indexOf('Reservation ID');
+  const values = {
+    'Reservation ID': details.reservationId,
+    'School': details.schoolName,
+    'Field Trip Date': details.fieldTripDate,
+    'Participant / Form Reference': 'School group',
+    'Guardian / Signer': details.signerName,
+    'Email': details.email,
+    'Sent Date': Utilities.formatDate(new Date(), APP_TIMEZONE, 'yyyy-MM-dd'),
+    'Signed Date': '',
+    'Status': 'SENT',
+    'Drive File / Folder': riskUrl,
+    'Staff Verified': 'NO',
+    'Notes': 'Risk form link included with confirmed field-trip communication.',
+  };
+  const row = headers.map((header) =>
+    Object.prototype.hasOwnProperty.call(values, header) ? values[header] : ''
+  );
+
+  let rowNumber = -1;
+  for (let i = 1; i < data.length; i += 1) {
+    if (idIndex >= 0 && String(data[i][idIndex]) === String(details.reservationId)) {
+      rowNumber = i + 1;
+      break;
+    }
+  }
+  if (rowNumber > 0) sheet.getRange(rowNumber, 1, 1, headers.length).setValues([row]);
+  else sheet.appendRow(row);
+  return {sent: true, url: riskUrl};
+}
 
 function createConfirmedCalendarEvent_(payload, reservationId, schoolName, workshopTitle, endTime) {
   const settings = getSettings_();
