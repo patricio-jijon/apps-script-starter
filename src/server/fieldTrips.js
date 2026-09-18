@@ -248,6 +248,31 @@ function confirmAvailabilitySlot_(sheet, date, time, calendarEventId) {
   return false;
 }
 
+function deleteCalendarEventForSlot_(sheet, date, time) {
+  const settings = getSettings_();
+  const calendarId = String(settings['Calendar ID'] || '').trim();
+  if (!calendarId || calendarId === 'TBD') return false;
+  const calendar = CalendarApp.getCalendarById(calendarId);
+  if (!calendar) return false;
+
+  const values = sheet.getDataRange().getValues();
+  for (let i = 1; i < values.length; i += 1) {
+    if (normalizeDate_(values[i][0]) !== date || String(values[i][1]) !== time) continue;
+    const eventId = String(values[i][6] || '').trim();
+    if (!eventId) return false;
+    try {
+      const event = calendar.getEventById(eventId);
+      if (event) {
+        event.deleteEvent();
+        return true;
+      }
+    } catch (error) {
+      return false;
+    }
+  }
+  return false;
+}
+
 function reopenAvailabilitySlot_(sheet, date, time) {
   const values = sheet.getDataRange().getValues();
   for (let i = 1; i < values.length; i += 1) {
@@ -889,13 +914,12 @@ export const cancelReservation = (reservationId) => {
   sheet.getRange(rowNumber, statusCol).setValue('CANCELLED');
   if (approvalCol > 0) sheet.getRange(rowNumber, approvalCol).setValue('CANCELLED');
 
-  reopenAvailabilitySlot_(
-    ss.getSheetByName('Availability'),
-    normalizeDate_(get('Date')),
-    String(get('Start Time') || '')
-  );
+  const date = normalizeDate_(get('Date'));
+  const time = String(get('Start Time') || '');
+  const calendarDeleted = deleteCalendarEventForSlot_(ss.getSheetByName('Availability'), date, time);
+  reopenAvailabilitySlot_(ss.getSheetByName('Availability'), date, time);
 
-  return {ok: true, reservationId, status: 'CANCELLED'};
+  return {ok: true, reservationId, status: 'CANCELLED', calendarDeleted};
 };
 
 export const sendReservationReminder = (reservationId) => {
