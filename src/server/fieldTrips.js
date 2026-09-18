@@ -41,7 +41,7 @@ export const getAppData = () => {
     standards: splitPipe_(r['Academic Standards']),
     photo: r['Photo / Media'] || '',
     video: r['Video URL'] || '',
-  })).filter((r) => r.id && r.title && !['Draft','Archived'].includes(r.status));
+  })).filter((r) => r.id && r.title && ['Featured','Published'].includes(r.status));
   const equipment = getObjects_(ss, 'Equipment').map((r) => ({
     category: r['Category'] || '',
     name: r['Equipment / Software'] || '',
@@ -287,29 +287,11 @@ function reopenAvailabilitySlot_(sheet, date, time) {
   return false;
 }
 
-function maybeCreateCalendarEvent_(payload, reservationId, schoolName, workshopTitle, endTime) {
-  const settings = getSettings_();
-  if (String(settings['Enable Calendar Automations']).toUpperCase() !== 'TRUE') return '';
-  const calendarId = String(settings['Calendar ID'] || '').trim();
-  if (!calendarId) return;
-  const calendar = CalendarApp.getCalendarById(calendarId);
-  if (!calendar) return;
-  const start = parseDateTime_(payload.date, payload.time);
-  const end = endTime ? parseDateTime_(payload.date, String(endTime)) : new Date(start.getTime() + 90 * 60000);
-  calendar.createEvent(
-    schoolName + ' — ' + workshopTitle,
-    start,
-    end,
-    {description: 'Reservation ID: ' + reservationId + '\nContact: ' + payload.contactName + ' <' + payload.contactEmail + '>'}
-  );
-}
-
 function maybeSendReservationEmails_(payload, reservationId, schoolName, workshopTitle, endTime) {
   const settings = getSettings_();
   if (String(settings['Enable Email Automations']).toUpperCase() !== 'TRUE') return;
 
   const subject = 'NYC FIRST D3 Field Trip Request — ' + reservationId;
-  const riskFormUrl = String(settings['Risk Form URL'] || '').trim();
   const costContact = String(settings['Cost Contact Email'] || 'kat@nycfirst.org').trim();
   const lines = [
     'Thank you for requesting an NYC FIRST STEM field trip.',
@@ -323,9 +305,7 @@ function maybeSendReservationEmails_(payload, reservationId, schoolName, worksho
     '',
     'Your request is pending staff review. We will send a final confirmation after review.'
   ];
-  if (riskFormUrl && riskFormUrl !== 'TBD') {
-    lines.push('', 'Assumption of Risk form: ' + riskFormUrl);
-  }
+  lines.push('', 'If your request is approved, NYC FIRST will send the official Assumption of Risk form with the confirmation/follow-up instructions.');
   lines.push('', 'Questions about field-trip cost: Katiuska Hernandez — ' + costContact);
   lines.push('', 'NYC FIRST · Washington Heights STEM Center');
   const body = lines.join('\n');
