@@ -21,7 +21,7 @@
     .nav{position:sticky;top:0;z-index:20;background:rgba(247,249,252,.92);backdrop-filter:blur(12px);border-bottom:1px solid rgba(219,227,238,.7)}
     .navin{max-width:1220px;margin:auto;padding:14px 20px;display:flex;align-items:center;gap:20px}
     .brand{display:flex;align-items:center;gap:10px;font-weight:900;letter-spacing:-.02em}
-    .logo{width:40px;height:40px;border-radius:13px;background:var(--deep);display:grid;place-items:center;color:white;font-size:20px}
+    .logo{width:48px;height:48px;border-radius:12px;background:white;display:grid;place-items:center;overflow:hidden;border:1px solid var(--line)}.logo img{width:100%;height:100%;object-fit:contain}
     .navlinks{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
     .navlinks button{border:0;background:transparent;border-radius:10px;padding:9px 12px;color:var(--muted);font-weight:700}
     .navlinks button:hover{background:white;color:var(--deep)}
@@ -101,7 +101,7 @@
 <body>
   <div class="nav">
     <div class="navin">
-      <div class="brand"><div class="logo">NYC</div><span>NYC FIRST · D3 STEM Field Trips</span></div>
+      <div class="brand"><div class="logo"><img src="https://raw.githubusercontent.com/patricio-jijon/apps-script-starter/d3-field-trips-demo/assets/NYCFIRST_square_CMYK.jpg" alt="NYC FIRST"></div><span>NYC FIRST · D3 STEM Field Trips</span></div>
       <div class="navlinks">
         <button onclick="go('activities')">Activities</button>
         <button onclick="go('book')">Book</button>
