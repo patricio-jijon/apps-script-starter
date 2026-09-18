@@ -814,6 +814,17 @@ export const approveReservation = (reservationId) => {
   if (!row) throw new Error('Reservation not found: ' + reservationId);
 
   const get = (name) => row[headers.indexOf(name)];
+  const currentStatus = String(get('Status') || '').toUpperCase();
+  if (currentStatus === 'CANCELLED') throw new Error('This reservation is already cancelled and cannot be approved.');
+  if (['CONFIRMED','RISK FORMS SENT','RISK FORMS COMPLETE','REMINDER SENT','COMPLETED'].includes(currentStatus)) {
+    return {
+      ok: true,
+      reservationId,
+      status: currentStatus,
+      alreadyApproved: true,
+      message: 'Reservation was already approved; no duplicate email or calendar event was created.',
+    };
+  }
   const statusCol = headers.indexOf('Status') + 1;
   const approvalCol = headers.indexOf('Staff Approval') + 1;
   const confirmationCol = headers.indexOf('Confirmation Sent') + 1;
@@ -925,7 +936,7 @@ export const runD3DailyAutomation = () => {
   let sent = 0;
   for (let i = 1; i < data.length; i += 1) {
     const status = String(data[i][col('Status')] || '').toUpperCase();
-    if (status !== 'CONFIRMED') continue;
+    if (!['CONFIRMED','RISK FORMS SENT','RISK FORMS COMPLETE','REMINDER SENT'].includes(status)) continue;
     const dateStr = normalizeDate_(data[i][col('Date')]);
     if (!dateStr) continue;
     const tripDate = new Date(dateStr + 'T12:00:00');
@@ -936,6 +947,7 @@ export const runD3DailyAutomation = () => {
       headers.forEach((h, idx) => { obj[h] = data[i][idx]; });
       sendReminderEmail_(obj);
       sheet.getRange(i + 1, col('Reminder 1 Sent') + 1).setValue('YES');
+      if (col('Status') >= 0) sheet.getRange(i + 1, col('Status') + 1).setValue('REMINDER SENT');
       sent += 1;
     }
     if (days === 2 && String(data[i][col('Reminder 2 Sent')] || '').toUpperCase() !== 'YES') {
@@ -943,6 +955,7 @@ export const runD3DailyAutomation = () => {
       headers.forEach((h, idx) => { obj[h] = data[i][idx]; });
       sendReminderEmail_(obj);
       sheet.getRange(i + 1, col('Reminder 2 Sent') + 1).setValue('YES');
+      if (col('Status') >= 0) sheet.getRange(i + 1, col('Status') + 1).setValue('REMINDER SENT');
       sent += 1;
     }
   }
