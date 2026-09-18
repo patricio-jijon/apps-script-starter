@@ -9,6 +9,7 @@ import {
   saveSetting,
   saveStaffRecord,
   approveReservation,
+  cancelReservation,
   sendReservationReminder,
   installD3AutomationTriggers,
   runD3DailyAutomation,
@@ -30,5 +31,6 @@ export {
   saveStaffRecord,
   sendReservationReminder,
   approveReservation,
+  cancelReservation,
   submitReservation,
 };
