@@ -378,6 +378,7 @@ export const getStaffAdminData = () => {
     attendance: serializeRows_(getObjects_(ss, 'Attendance')),
     communicationLog: serializeRows_(getObjects_(ss, 'Communication Log')).reverse().slice(0, 500),
     analytics: buildStaffAnalytics_(ss),
+    launchReadiness: buildLaunchReadiness_(ss),
     settings: serializeObject_(getSettings_()),
     staffEmail: Session.getActiveUser().getEmail(),
   };
@@ -1218,6 +1219,63 @@ function buildCampaign_(ss, campaignId) {
     recipients,
     recipientCount: recipients.length,
     status: String(campaign['Status'] || ''),
+  };
+}
+
+function buildLaunchReadiness_(ss) {
+  const settings = getSettings_();
+  const workshops = getObjects_(ss, 'Workshops');
+  const availability = getObjects_(ss, 'Availability');
+  const schools = getObjects_(ss, 'D3 Schools');
+  const contacts = getObjects_(ss, 'Outreach Contacts');
+
+  const checks = [
+    {
+      key: 'riskForm',
+      label: 'Official Risk Form URL',
+      ready: Boolean(String(settings['Risk Form URL'] || '').trim()) && String(settings['Risk Form URL']).trim() !== 'TBD',
+    },
+    {
+      key: 'calendar',
+      label: 'Production Calendar ID',
+      ready: Boolean(String(settings['Calendar ID'] || '').trim()) && String(settings['Calendar ID']).trim() !== 'TBD',
+    },
+    {
+      key: 'publicUrl',
+      label: 'Production Public App URL',
+      ready: Boolean(String(settings['Public App URL'] || '').trim()) && String(settings['Public App URL']).trim() !== 'TBD',
+    },
+    {
+      key: 'activities',
+      label: 'Published Activities',
+      ready: workshops.some((r) => ['Featured','Published'].includes(String(r['Publication Status'] || ''))),
+    },
+    {
+      key: 'availability',
+      label: 'Official Availability',
+      ready: availability.some((r) => String(r['Status'] || '').toUpperCase() === 'OPEN' &&
+        !String(r['Staff Notes'] || '').toUpperCase().includes('DEMO')),
+    },
+    {
+      key: 'schools',
+      label: 'Active D3 Schools',
+      ready: schools.some((r) => String(r['Active']).toUpperCase() === 'TRUE'),
+    },
+    {
+      key: 'contacts',
+      label: 'School Contacts',
+      ready: contacts.some((r) => String(r['Email'] || '').trim()),
+    },
+  ];
+
+  const completed = checks.filter((item) => item.ready).length;
+  return {
+    checks,
+    completed,
+    total: checks.length,
+    percent: checks.length ? Math.round((completed / checks.length) * 100) : 0,
+    emailAutomationsEnabled: String(settings['Enable Email Automations'] || '').toUpperCase() === 'TRUE',
+    calendarAutomationsEnabled: String(settings['Enable Calendar Automations'] || '').toUpperCase() === 'TRUE',
   };
 }
 
