@@ -41,7 +41,7 @@ export const getAppData = () => {
     standards: splitPipe_(r['Academic Standards']),
     photo: r['Photo / Media'] || '',
     video: r['Video URL'] || '',
-  })).filter((r) => r.id && r.title && r.status !== 'Archived');
+  })).filter((r) => r.id && r.title && !['Draft','Archived'].includes(r.status));
   const equipment = getObjects_(ss, 'Equipment').map((r) => ({
     category: r['Category'] || '',
     name: r['Equipment / Software'] || '',
@@ -137,7 +137,7 @@ export const submitReservation = (payload) => {
     'NOT SENT', '', 'PENDING', 'NO', 'NO', 'NO', 'NO'
   ]);
 
-  markAvailabilityBooked_(availability, payload.date, payload.time, reservationId);
+  holdAvailabilitySlot_(availability, payload.date, payload.time, reservationId);
   maybeSendReservationEmails_(payload, reservationId, schoolName, workshopTitle, endTime);
 
   return {
@@ -202,22 +202,54 @@ function normalizeDate_(value) {
   return s;
 }
 
-function markAvailabilityBooked_(sheet, date, time, reservationId) {
+function holdAvailabilitySlot_(sheet, date, time, reservationId) {
   const values = sheet.getDataRange().getValues();
   for (let i = 1; i < values.length; i += 1) {
     if (normalizeDate_(values[i][0]) === date &&
         String(values[i][1]) === time &&
         String(values[i][3]).toUpperCase() === 'OPEN') {
-      sheet.getRange(i + 1, 4).setValue('BOOKED');
-      sheet.getRange(i + 1, 7).setValue(reservationId);
-      return;
+      sheet.getRange(i + 1, 4).setValue('HOLD');
+      const existingNote = String(values[i][7] || '').trim();
+      sheet.getRange(i + 1, 8).setValue(
+        (existingNote ? existingNote + ' | ' : '') + 'Reservation hold: ' + reservationId
+      );
+      return true;
     }
   }
+  return false;
+}
+
+function confirmAvailabilitySlot_(sheet, date, time, calendarEventId) {
+  const values = sheet.getDataRange().getValues();
+  for (let i = 1; i < values.length; i += 1) {
+    if (normalizeDate_(values[i][0]) === date &&
+        String(values[i][1]) === time &&
+        ['HOLD','OPEN'].includes(String(values[i][3]).toUpperCase())) {
+      sheet.getRange(i + 1, 4).setValue('BOOKED');
+      if (calendarEventId) sheet.getRange(i + 1, 7).setValue(calendarEventId);
+      return true;
+    }
+  }
+  return false;
+}
+
+function reopenAvailabilitySlot_(sheet, date, time) {
+  const values = sheet.getDataRange().getValues();
+  for (let i = 1; i < values.length; i += 1) {
+    if (normalizeDate_(values[i][0]) === date && String(values[i][1]) === time) {
+      sheet.getRange(i + 1, 4).setValue('OPEN');
+      sheet.getRange(i + 1, 7).clearContent();
+      const note = String(values[i][7] || '').replace(/\s*\|?\s*Reservation hold: [^|]+/g, '').trim();
+      sheet.getRange(i + 1, 8).setValue(note);
+      return true;
+    }
+  }
+  return false;
 }
 
 function maybeCreateCalendarEvent_(payload, reservationId, schoolName, workshopTitle, endTime) {
   const settings = getSettings_();
-  if (String(settings['Enable Calendar Automations']).toUpperCase() !== 'TRUE') return;
+  if (String(settings['Enable Calendar Automations']).toUpperCase() !== 'TRUE') return '';
   const calendarId = String(settings['Calendar ID'] || '').trim();
   if (!calendarId) return;
   const calendar = CalendarApp.getCalendarById(calendarId);
@@ -304,6 +336,7 @@ export const getStaffAdminData = () => {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   return {
     reservations: getObjects_(ss, 'Reservations'),
+    schools: getObjects_(ss, 'D3 Schools'),
     workshops: getObjects_(ss, 'Workshops'),
     equipment: getObjects_(ss, 'Equipment'),
     availability: getObjects_(ss, 'Availability'),
@@ -321,6 +354,7 @@ export const getStaffAdminData = () => {
 export const saveStaffRecord = (sheetName, keyHeader, keyValue, values) => {
   verifyStaff_();
   const allowed = {
+    'D3 Schools': true,
     'Workshops': true,
     'Availability': true,
     'Outreach Contacts': true,
@@ -419,11 +453,47 @@ export const approveReservation = (reservationId) => {
   const schoolName = String(get('School Name') || '');
   const workshopTitle = String(get('Workshop Title') || '');
 
-  createConfirmedCalendarEvent_(payload, reservationId, schoolName, workshopTitle, endTime);
-  sendConfirmedReservationEmail_(payload, reservationId, schoolName, workshopTitle, endTime);
+  const calendarEventId = createConfirmedCalendarEvent_(payload, reservationId, schoolName, workshopTitle, endTime);
+  confirmAvailabilitySlot_(ss.getSheetByName('Availability'), payload.date, payload.time, calendarEventId);
+  const confirmationSent = sendConfirmedReservationEmail_(payload, reservationId, schoolName, workshopTitle, endTime);
 
-  if (confirmationCol > 0) sheet.getRange(rowNumber, confirmationCol).setValue('YES');
-  return {ok: true, reservationId, status: 'CONFIRMED'};
+  if (confirmationCol > 0) sheet.getRange(rowNumber, confirmationCol).setValue(confirmationSent ? 'YES' : 'NO');
+  return {ok: true, reservationId, status: 'CONFIRMED', confirmationSent, calendarEventId: calendarEventId || ''};
+};
+
+export const cancelReservation = (reservationId) => {
+  verifyStaff_();
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName('Reservations');
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0].map((h) => String(h || '').trim());
+  const idCol = headers.indexOf('Reservation ID');
+  if (idCol < 0) throw new Error('Reservation ID column is missing.');
+
+  let rowNumber = -1;
+  let row = null;
+  for (let i = 1; i < data.length; i += 1) {
+    if (String(data[i][idCol]) === String(reservationId)) {
+      rowNumber = i + 1;
+      row = data[i];
+      break;
+    }
+  }
+  if (!row) throw new Error('Reservation not found: ' + reservationId);
+
+  const get = (name) => row[headers.indexOf(name)];
+  const statusCol = headers.indexOf('Status') + 1;
+  const approvalCol = headers.indexOf('Staff Approval') + 1;
+  sheet.getRange(rowNumber, statusCol).setValue('CANCELLED');
+  if (approvalCol > 0) sheet.getRange(rowNumber, approvalCol).setValue('CANCELLED');
+
+  reopenAvailabilitySlot_(
+    ss.getSheetByName('Availability'),
+    normalizeDate_(get('Date')),
+    String(get('Start Time') || '')
+  );
+
+  return {ok: true, reservationId, status: 'CANCELLED'};
 };
 
 export const sendReservationReminder = (reservationId) => {
@@ -491,12 +561,12 @@ function createConfirmedCalendarEvent_(payload, reservationId, schoolName, works
   const settings = getSettings_();
   if (String(settings['Enable Calendar Automations']).toUpperCase() !== 'TRUE') return;
   const calendarId = String(settings['Calendar ID'] || '').trim();
-  if (!calendarId || calendarId === 'TBD') return;
+  if (!calendarId || calendarId === 'TBD') return '';
   const calendar = CalendarApp.getCalendarById(calendarId);
-  if (!calendar) return;
+  if (!calendar) return '';
   const start = parseDateTime_(payload.date, payload.time);
   const end = endTime ? parseDateTime_(payload.date, endTime) : new Date(start.getTime() + 90 * 60000);
-  calendar.createEvent(
+  const event = calendar.createEvent(
     schoolName + ' — ' + workshopTitle,
     start,
     end,
@@ -510,11 +580,12 @@ function createConfirmedCalendarEvent_(payload, reservationId, schoolName, works
       ].join('\n')
     }
   );
+  return event.getId();
 }
 
 function sendConfirmedReservationEmail_(payload, reservationId, schoolName, workshopTitle, endTime) {
   const settings = getSettings_();
-  if (String(settings['Enable Email Automations']).toUpperCase() !== 'TRUE') return;
+  if (String(settings['Enable Email Automations']).toUpperCase() !== 'TRUE') return false;
   const riskFormUrl = String(settings['Risk Form URL'] || '').trim();
   const costEmail = String(settings['Cost Contact Email'] || 'kat@nycfirst.org').trim();
   const lines = [
@@ -535,6 +606,7 @@ function sendConfirmedReservationEmail_(payload, reservationId, schoolName, work
   lines.push('', 'Questions about field-trip cost: Katiuska Hernandez — ' + costEmail);
   lines.push('', 'NYC FIRST · Washington Heights STEM Center');
   MailApp.sendEmail(payload.contactEmail, 'NYC FIRST Field Trip Confirmed — ' + reservationId, lines.join('\n'));
+  return true;
 }
 
 function sendReminderEmail_(reservation) {
