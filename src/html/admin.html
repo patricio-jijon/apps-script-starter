@@ -116,7 +116,7 @@ function render(){
       ['School Name','text'],['Type','text'],['Address','textarea'],['Grades','text'],['Outreach Contact Status','text'],['Active','select:TRUE|FALSE']
     ],d.schools||[])+
     table('D3 Schools',d.schools||[],['School ID / DBN','School Name','Type','Address','Grades','Outreach Contact Status','Active'],
-      r=>'<button class="btn secondary" onclick="openEditor(\\'D3 Schools\\',\\'School ID / DBN\\',\\''+jsq(r['School ID / DBN'])+'\\')">Edit</button>');
+      r=>'<button class="btn secondary" onclick="openEditor(\'D3 Schools\',\'School ID / DBN\',\''+jsq(r['School ID / DBN'])+'\')">Edit</button>');
 
   document.getElementById('contacts').innerHTML=
     editorIntro('D3 Schools & STEM Contacts','Maintain teachers, parent coordinators, STEM leads, email addresses, outreach status, and communication notes.')+
