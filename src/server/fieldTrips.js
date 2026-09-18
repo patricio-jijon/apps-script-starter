@@ -622,6 +622,60 @@ export const sendRiskFormLink = (reservationId) => {
   return {ok: true, reservationId, email};
 };
 
+export const previewCampaign = (campaignId) => {
+  verifyStaff_();
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  return buildCampaign_(ss, campaignId);
+};
+
+export const sendCampaign = (campaignId) => {
+  verifyStaff_();
+  const settings = getSettings_();
+  if (String(settings['Enable Email Automations']).toUpperCase() !== 'TRUE') {
+    throw new Error('Email automations are disabled in Settings.');
+  }
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const campaign = buildCampaign_(ss, campaignId);
+  if (!campaign.recipients.length) throw new Error('This campaign has no recipients.');
+
+  const sender = String(settings['Cost Contact Email'] || Session.getActiveUser().getEmail() || '').trim();
+  const batchSize = 50;
+  for (let i = 0; i < campaign.recipients.length; i += batchSize) {
+    const chunk = campaign.recipients.slice(i, i + batchSize);
+    MailApp.sendEmail({
+      to: sender,
+      bcc: chunk.join(','),
+      subject: campaign.subject,
+      body: campaign.body,
+      name: 'NYC FIRST',
+      replyTo: sender,
+    });
+  }
+
+  const sheet = ss.getSheetByName('Email Campaigns');
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0].map((h) => String(h || '').trim());
+  const idIndex = headers.indexOf('Campaign ID');
+  const sentIndex = headers.indexOf('Sent Date');
+  const statusIndex = headers.indexOf('Status');
+  for (let i = 1; i < data.length; i += 1) {
+    if (String(data[i][idIndex]) === String(campaignId)) {
+      if (sentIndex >= 0) sheet.getRange(i + 1, sentIndex + 1).setValue(Utilities.formatDate(new Date(), APP_TIMEZONE, 'yyyy-MM-dd'));
+      if (statusIndex >= 0) sheet.getRange(i + 1, statusIndex + 1).setValue('SENT');
+      break;
+    }
+  }
+
+  logCommunication_(ss, {
+    type: 'CAMPAIGN',
+    subject: campaign.subject,
+    campaignId,
+    notes: 'Campaign sent to ' + campaign.recipients.length + ' recipient(s).',
+  });
+
+  return {ok: true, campaignId, recipientCount: campaign.recipients.length};
+};
+
 export const geocodeD3Schools = () => {
   verifyStaff_();
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -1050,6 +1104,50 @@ function logCommunication_(ss, details) {
   sheet.appendRow(headers.map((header) =>
     Object.prototype.hasOwnProperty.call(values, header) ? values[header] : ''
   ));
+}
+
+function buildCampaign_(ss, campaignId) {
+  const campaign = getObjects_(ss, 'Email Campaigns')
+    .find((r) => String(r['Campaign ID']) === String(campaignId));
+  if (!campaign) throw new Error('Campaign not found: ' + campaignId);
+
+  const templateId = String(campaign['Template ID'] || '').trim();
+  const template = getObjects_(ss, 'Email Templates')
+    .find((r) => String(r['Template ID']) === templateId);
+  const subject = String(campaign['Subject'] || (template && template['Subject']) || '').trim();
+  const body = String((template && template['Body / Message']) || '').trim();
+  if (!subject) throw new Error('Campaign subject is missing.');
+  if (!body) throw new Error('Campaign template body is missing.');
+
+  const explicit = String(campaign['Recipients'] || '')
+    .split(/[;,\n]/)
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s));
+
+  let recipients = explicit;
+  if (!recipients.length) {
+    const contacts = getObjects_(ss, 'Outreach Contacts');
+    const audience = String(campaign['Audience'] || '').toLowerCase();
+    if (!audience || audience.includes('district 3') || audience.includes('d3') || audience.includes('all')) {
+      recipients = contacts.map((r) => String(r['Email'] || '').trim().toLowerCase());
+    } else if (audience.includes('stem') || audience.includes('teacher')) {
+      recipients = contacts
+        .filter((r) => /STEM|SCIENCE|ROBOT|ENGINEER|TEACHER/i.test(String(r['Role'] || '')))
+        .map((r) => String(r['Email'] || '').trim().toLowerCase());
+    }
+  }
+  recipients = [...new Set(recipients.filter((s) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s)))];
+
+  return {
+    campaignId,
+    campaignName: String(campaign['Campaign Name'] || ''),
+    subject,
+    body,
+    audience: String(campaign['Audience'] || ''),
+    recipients,
+    recipientCount: recipients.length,
+    status: String(campaign['Status'] || ''),
+  };
 }
 
 function buildStaffAnalytics_(ss) {
