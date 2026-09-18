@@ -5,6 +5,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>NYC FIRST · D3 Field Trips Staff</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700;800;900&display=swap');
     :root{--tory:#154593;--endeavour:#0065B3;--cerulean:#009CD6;--red:#ED1C24;--ink:#010101;--gray:#626262;--line:#dbe3ee;--paper:#f6f8fb}
@@ -21,7 +23,7 @@
     .scroll{overflow:auto;max-height:64vh}.hidden{display:none}.notice{padding:11px 13px;border-radius:10px;margin:10px 0}.ok{background:#e8f7f2;color:#176855}.err{background:#fff0ee;color:#8f2d21}
     .formgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.full{grid-column:1/-1}.muted{color:var(--gray);font-size:13px;line-height:1.5}
     .editbar{display:flex;gap:10px;flex-wrap:wrap;align-items:end}.editbar>div{min-width:180px;flex:1}.danger{background:var(--red);color:#fff}.pill{display:inline-block;padding:4px 8px;border-radius:999px;background:#eef4fb;color:var(--tory);font-weight:800;font-size:11px}
-    .chartgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}.chartbox{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px;min-height:300px}.bars{display:flex;flex-direction:column;gap:10px}.barrow{display:grid;grid-template-columns:180px 1fr 70px;gap:10px;align-items:center}.bartrack{height:14px;background:#edf2f7;border-radius:999px;overflow:hidden}.barfill{height:100%;background:var(--cerulean);border-radius:999px}.mapwrap{position:relative;background:#eef4f8;border:1px solid var(--line);border-radius:18px;min-height:560px;overflow:hidden}.mapgrid{position:absolute;inset:0;background-image:linear-gradient(rgba(21,69,147,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(21,69,147,.06) 1px,transparent 1px);background-size:40px 40px}.marker{position:absolute;transform:translate(-50%,-50%);width:18px;height:18px;border-radius:50%;background:var(--red);border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.25);cursor:pointer}.maplegend{position:absolute;right:14px;bottom:14px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;font-size:12px;max-width:260px}.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;place-items:center;padding:20px;z-index:50}.modal.open{display:grid}.modalbox{background:#fff;border-radius:18px;max-width:780px;width:100%;max-height:90vh;overflow:auto;padding:22px}.modalhead{display:flex;justify-content:space-between;gap:10px;align-items:center}.close{border:0;background:#eef2f6;border-radius:50%;width:36px;height:36px;font-weight:900}
+    .chartgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}.chartbox{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px;min-height:300px}.bars{display:flex;flex-direction:column;gap:10px}.barrow{display:grid;grid-template-columns:180px 1fr 70px;gap:10px;align-items:center}.bartrack{height:14px;background:#edf2f7;border-radius:999px;overflow:hidden}.barfill{height:100%;background:var(--cerulean);border-radius:999px}.mapwrap{position:relative;background:#eef4f8;border:1px solid var(--line);border-radius:18px;min-height:560px;overflow:hidden}.leafletmap{height:560px;width:100%}.mapgrid{position:absolute;inset:0;background-image:linear-gradient(rgba(21,69,147,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(21,69,147,.06) 1px,transparent 1px);background-size:40px 40px}.marker{position:absolute;transform:translate(-50%,-50%);width:18px;height:18px;border-radius:50%;background:var(--red);border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.25);cursor:pointer}.maplegend{position:absolute;right:14px;bottom:14px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;font-size:12px;max-width:260px}.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;place-items:center;padding:20px;z-index:50}.modal.open{display:grid}.modalbox{background:#fff;border-radius:18px;max-width:780px;width:100%;max-height:90vh;overflow:auto;padding:22px}.modalhead{display:flex;justify-content:space-between;gap:10px;align-items:center}.close{border:0;background:#eef2f6;border-radius:50%;width:36px;height:36px;font-weight:900}
     @media(max-width:900px){.chartgrid{grid-template-columns:1fr}.barrow{grid-template-columns:120px 1fr 60px}.layout{grid-template-columns:1fr}aside{border-right:0;border-bottom:1px solid var(--line)}nav{display:flex;gap:6px;overflow:auto}.cards{grid-template-columns:repeat(2,1fr)}.formgrid{grid-template-columns:1fr}.full{grid-column:auto}}
   </style>
 </head>
@@ -91,6 +93,7 @@ function render(){
 
   document.getElementById('analytics').innerHTML=renderAnalytics(d.analytics||{});
   document.getElementById('map').innerHTML=renderSchoolMap(d.analytics||{});
+  setTimeout(()=>initLeafletMap(d.analytics||{}),0);
   document.getElementById('followup').innerHTML=renderFollowUp(d.analytics||{});
 
   document.getElementById('reservations').innerHTML=
@@ -186,6 +189,12 @@ function renderAnalytics(a){
     '<div class="card"><div class="metric">'+esc(t.schoolsWithTrips||0)+'</div><b>Schools Visited</b></div>'+
     '<div class="card"><div class="metric">'+esc(t.reservations||0)+'</div><b>Active Reservations</b></div>'+
   '</div>'+
+  '<div class="panel"><div class="cards" style="margin-bottom:0">'+
+    '<div class="card"><div class="metric">'+esc(t.expectedStudents||0)+'</div><b>Expected Students</b></div>'+
+    '<div class="card"><div class="metric">'+esc(t.actualStudents||0)+'</div><b>Actual Students</b></div>'+
+    '<div class="card"><div class="metric">'+esc(t.attendanceRate||0)+'%</div><b>Attendance Rate</b></div>'+
+    '<div class="card"><div class="metric">'+esc(t.cancelled||0)+'</div><b>Cancelled Requests</b></div>'+
+  '</div></div>'+
   '<div class="chartgrid">'+
     '<div class="chartbox"><h2>Attendance by School</h2>'+barChart(a.topSchools||[],'schoolName','actualStudents','students')+'</div>'+
     '<div class="chartbox"><h2>Field Trips by School</h2>'+barChart((a.schoolStats||[]).filter(x=>x.reservations>0).sort((x,y)=>y.reservations-x.reservations).slice(0,12),'schoolName','reservations','trips')+'</div>'+
@@ -205,28 +214,53 @@ function shorten(v,n){v=String(v||'');return v.length>n?v.slice(0,n-1)+'…':v}
 function renderSchoolMap(a){
   const rows=(a.schoolStats||[]).filter(s=>s.latitude&&s.longitude);
   const needs=(a.schoolStats||[]).filter(s=>!s.latitude||!s.longitude).length;
-  let html='<div class="panel"><h1>D3 School Map</h1><p class="muted">Click a school marker to see contact and attendance details. '+needs+' school(s) still need map coordinates.</p><div class="toolbar"><button class="btn primary" onclick="geocodeSchoolsUI()">Update School Coordinates</button></div></div>';
+  let html='<div class="panel"><h1>D3 School Map</h1><p class="muted">Interactive District 3 school map with field-trip attendance and follow-up contacts. '+needs+' school(s) still need coordinates.</p><div class="toolbar"><button class="btn primary" onclick="geocodeSchoolsUI()">Update School Coordinates</button></div></div>';
   if(!rows.length)return html+'<div class="panel"><p class="muted">No school coordinates are available yet. Use <b>Update School Coordinates</b> to geocode the addresses already stored in D3 Schools.</p></div>';
-  const lats=rows.map(x=>x.latitude),lngs=rows.map(x=>x.longitude);
-  const minLat=Math.min(...lats),maxLat=Math.max(...lats),minLng=Math.min(...lngs),maxLng=Math.max(...lngs);
-  const latSpan=Math.max(maxLat-minLat,.01),lngSpan=Math.max(maxLng-minLng,.01);
-  html+='<div class="mapwrap"><div class="mapgrid"></div>'+rows.map((s,i)=>{
-    const left=6+((s.longitude-minLng)/lngSpan)*88;
-    const top=94-((s.latitude-minLat)/latSpan)*88;
-    return '<button class="marker" style="left:'+left+'%;top:'+top+'%" title="'+esc(s.schoolName)+'" onclick="showSchoolMapDetail('+i+')"></button>';
-  }).join('')+'<div id="mapLegend" class="maplegend"><b>District 3 Schools</b><br>Select a marker for school, attendance, and contact information.</div></div>';
-  window._mapSchools=rows;
-  return html;
+  return html+'<div class="panel"><div id="d3LeafletMap" class="leafletmap"></div></div>';
 }
-function showSchoolMapDetail(i){
-  const s=(window._mapSchools||[])[i];if(!s)return;
-  document.getElementById('mapLegend').innerHTML='<b>'+esc(s.schoolName)+'</b><br>'+esc(s.address)+'<br><br><b>Attendance:</b> '+esc(s.actualStudents)+' students / '+esc(s.completedTrips)+' trips<br><b>Contact:</b> '+esc(s.contactName||'Not assigned')+'<br><b>Email:</b> '+(s.contactEmail?'<a href="mailto:'+esc(s.contactEmail)+'">'+esc(s.contactEmail)+'</a>':'Not available')+'<br><b>Role:</b> '+esc(s.contactRole||'')+'<br><b>Last trip:</b> '+esc(s.lastTrip||'—');
+function initLeafletMap(a){
+  const host=document.getElementById('d3LeafletMap');
+  if(!host||!window.L)return;
+  if(window._d3Map){window._d3Map.remove();window._d3Map=null;}
+  const rows=(a.schoolStats||[]).filter(s=>s.latitude&&s.longitude);
+  if(!rows.length)return;
+  const map=L.map(host,{scrollWheelZoom:false});
+  window._d3Map=map;
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    maxZoom:19,
+    attribution:'&copy; OpenStreetMap contributors'
+  }).addTo(map);
+  const bounds=[];
+  rows.forEach(s=>{
+    const lat=Number(s.latitude),lng=Number(s.longitude);
+    if(!Number.isFinite(lat)||!Number.isFinite(lng))return;
+    bounds.push([lat,lng]);
+    const email=s.fieldTripContactEmail||s.contactEmail||'';
+    const name=s.fieldTripContactName||s.contactName||'Not assigned';
+    const role=s.fieldTripContactEmail?'Field Trip Contact':(s.contactRole||'');
+    const popup='<b>'+esc(s.schoolName)+'</b><br>'+esc(s.address)+
+      '<br><br><b>Students attended:</b> '+esc(s.actualStudents)+
+      '<br><b>Completed trips:</b> '+esc(s.completedTrips)+
+      '<br><b>Last trip:</b> '+esc(s.lastTrip||'—')+
+      '<br><br><b>Contact:</b> '+esc(name)+
+      (role?'<br><b>Role:</b> '+esc(role):'')+
+      (email?'<br><b>Email:</b> <a href="mailto:'+esc(email)+'">'+esc(email)+'</a>':'');
+    L.marker([lat,lng]).addTo(map).bindPopup(popup);
+  });
+  if(bounds.length===1)map.setView(bounds[0],14);
+  else map.fitBounds(bounds,{padding:[24,24]});
 }
 function renderFollowUp(a){
   const rows=a.followUp||[];
-  return '<div class="panel"><h1>School Follow-up</h1><p class="muted">Use this view to reconnect with schools after field trips and continue outreach with the saved school contact.</p></div>'+
-    table('D3 Follow-up Contacts',rows,['schoolName','schoolId','contactName','contactRole','contactEmail','contactPhone','lastTrip','actualStudents','completedTrips','lastContacted','outreachStatus'],
-      r=>r.contactEmail?'<a class="btn secondary" href="mailto:'+esc(r.contactEmail)+'?subject='+encodeURIComponent('NYC FIRST D3 STEM Field Trips')+'">Email</a>':'');
+  return '<div class="panel"><h1>School Follow-up</h1><p class="muted">The follow-up contact prioritizes the teacher/contact from the latest field-trip reservation, then falls back to the outreach database.</p></div>'+
+    table('D3 Follow-up Contacts',rows,['schoolName','schoolId','followUpName','followUpRole','followUpEmail','followUpPhone','followUpSource','lastTrip','actualStudents','completedTrips','lastContacted','outreachStatus'],
+      r=>{
+        let actions='<div class="toolbar">';
+        if(r.followUpEmail)actions+='<a class="btn secondary" href="mailto:'+esc(r.followUpEmail)+'?subject='+encodeURIComponent('NYC FIRST D3 STEM Field Trips')+'">Email</a>';
+        if(r.contactEmail)actions+='<button class="btn secondary" onclick="markContactedUI(\''+jsq(r.contactEmail)+'\')">Mark contacted</button>';
+        actions+='</div>';
+        return actions;
+      });
 }
 function geocodeSchoolsUI(){
   showNotice('Updating school coordinates…','ok');
@@ -239,6 +273,7 @@ function reservationActions(r){
   let out='<div class="toolbar">';
   if(status!=='CONFIRMED'&&status!=='CANCELLED') out+='<button class="btn primary" onclick="approveReservationUI(\''+id+'\')">Approve</button>';
   if(status==='CONFIRMED') out+='<button class="btn secondary" onclick="sendReminderUI(\''+id+'\')">Send reminder</button>';
+  if(status!=='CANCELLED') out+='<button class="btn secondary" onclick="openAttendanceUI(\''+id+'\')">Attendance</button>';
   if(status!=='CANCELLED') out+='<button class="btn danger" onclick="cancelReservationUI(\''+id+'\')">Cancel</button>';
   out+='</div>';
   return out;
@@ -346,6 +381,25 @@ function sendReminderUI(id){
   showNotice('Sending reminder…','ok');
   google.script.run.withSuccessHandler(()=>showNotice('Reminder sent.','ok'))
     .withFailureHandler(e=>showNotice(e.message||e,'err')).sendReservationReminder(id);
+}
+function openAttendanceUI(id){
+  const r=(state.data.reservations||[]).find(x=>String(x['Reservation ID'])===String(id));
+  if(!r)return;
+  const current=r['Actual Students']??'';
+  const actual=prompt('Actual students attended for '+id+':',current);
+  if(actual===null)return;
+  const adults=prompt('Adults / chaperones:',r['Adults / Chaperones']??'');
+  if(adults===null)return;
+  const notes=prompt('Attendance notes (optional):','');
+  showNotice('Saving attendance…','ok');
+  google.script.run.withSuccessHandler(()=>{showNotice('Attendance saved and trip marked completed.','ok');reloadData();})
+    .withFailureHandler(e=>showNotice(e.message||e,'err'))
+    .recordAttendance(id,{actualStudents:actual,adults:adults,notes:notes||''});
+}
+function markContactedUI(email){
+  showNotice('Updating follow-up date…','ok');
+  google.script.run.withSuccessHandler(r=>{showNotice('Marked contacted on '+r.lastContacted+'.','ok');reloadData();})
+    .withFailureHandler(e=>showNotice(e.message||e,'err')).markSchoolContacted(email);
 }
 function cancelReservationUI(id){
   if(!confirm('Cancel '+id+'? The held/booked time slot will be reopened.'))return;
