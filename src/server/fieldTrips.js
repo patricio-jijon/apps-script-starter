@@ -58,6 +58,10 @@ export const getAppData = () => {
       stemCenter: 'Washington Heights STEM Center',
       tagline: 'What STEM education should be.',
     },
+    publicContacts: {
+      costName: 'Katiuska Hernandez',
+      costEmail: 'kat@nycfirst.org',
+    },
     demo: false,
     databaseReady: true,
   };
@@ -217,7 +221,9 @@ function maybeSendReservationEmails_(payload, reservationId, schoolName, worksho
   if (String(settings['Enable Email Automations']).toUpperCase() !== 'TRUE') return;
 
   const subject = 'NYC FIRST D3 Field Trip Request — ' + reservationId;
-  const body = [
+  const riskFormUrl = String(settings['Risk Form URL'] || '').trim();
+  const costContact = String(settings['Cost Contact Email'] || 'kat@nycfirst.org').trim();
+  const lines = [
     'Thank you for requesting an NYC FIRST STEM field trip.',
     '',
     'Reservation ID: ' + reservationId,
@@ -227,18 +233,27 @@ function maybeSendReservationEmails_(payload, reservationId, schoolName, worksho
     'Time: ' + payload.time + (endTime ? ' – ' + endTime : ''),
     'Expected students: ' + (payload.expectedStudents || ''),
     '',
-    'Your request is pending staff review. We will send a final confirmation after review.',
-    '',
-    'NYC FIRST · Washington Heights STEM Center'
-  ].join('\n');
+    'Your request is pending staff review. We will send a final confirmation after review.'
+  ];
+  if (riskFormUrl && riskFormUrl !== 'TBD') {
+    lines.push('', 'Assumption of Risk form: ' + riskFormUrl);
+  }
+  lines.push('', 'Questions about field-trip cost: Katiuska Hernandez — ' + costContact);
+  lines.push('', 'NYC FIRST · Washington Heights STEM Center');
+  const body = lines.join('\n');
   MailApp.sendEmail(payload.contactEmail, subject, body);
 
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const staff = getObjects_(ss, 'Staff Access')
+  const explicitRecipients = String(settings['Internal Booking Alert Emails'] || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const staffRecipients = getObjects_(ss, 'Staff Access')
     .filter((r) => String(r['Active']).toUpperCase() === 'TRUE' &&
       String(r['Receive New Booking Alerts']).toUpperCase() === 'TRUE' &&
       r['Staff Email'])
-    .map((r) => r['Staff Email']);
+    .map((r) => String(r['Staff Email']).trim());
+  const staff = [...new Set(explicitRecipients.concat(staffRecipients))];
   if (staff.length) {
     MailApp.sendEmail(staff.join(','), 'New D3 Field Trip Request — ' + reservationId, body);
   }
@@ -265,4 +280,77 @@ function parseDateTime_(dateString, timeString) {
 
 function createReservationId_(dateString) {
   return 'D3-' + String(dateString).replace(/-/g, '') + '-' + Utilities.getUuid().slice(0, 6).toUpperCase();
+}
+
+
+export const getStaffAdminData = () => {
+  verifyStaff_();
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  return {
+    reservations: getObjects_(ss, 'Reservations'),
+    workshops: getObjects_(ss, 'Workshops'),
+    availability: getObjects_(ss, 'Availability'),
+    contacts: getObjects_(ss, 'Outreach Contacts'),
+    campaigns: getObjects_(ss, 'Email Campaigns'),
+    templates: getObjects_(ss, 'Email Templates'),
+    media: getObjects_(ss, 'Media Library'),
+    riskForms: getObjects_(ss, 'Risk Forms'),
+    attendance: getObjects_(ss, 'Attendance'),
+    settings: getSettings_(),
+    staffEmail: Session.getActiveUser().getEmail(),
+  };
+};
+
+export const saveStaffRecord = (sheetName, keyHeader, keyValue, values) => {
+  verifyStaff_();
+  const allowed = {
+    'Workshops': true,
+    'Availability': true,
+    'Outreach Contacts': true,
+    'Email Campaigns': true,
+    'Email Templates': true,
+    'Media Library': true,
+    'Risk Forms': true,
+    'Attendance': true,
+  };
+  if (!allowed[sheetName]) throw new Error('This section cannot be edited from the staff interface.');
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(sheetName);
+  if (!sheet) throw new Error('Sheet not found: ' + sheetName);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0].map((h) => String(h || '').trim());
+  const keyIndex = headers.indexOf(keyHeader);
+  if (keyIndex < 0) throw new Error('Key column not found: ' + keyHeader);
+
+  let rowNumber = -1;
+  for (let i = 1; i < data.length; i += 1) {
+    if (String(data[i][keyIndex]) === String(keyValue)) {
+      rowNumber = i + 1;
+      break;
+    }
+  }
+
+  const row = headers.map((header) =>
+    Object.prototype.hasOwnProperty.call(values, header) ? values[header] : ''
+  );
+  row[keyIndex] = keyValue;
+
+  if (rowNumber > 0) {
+    sheet.getRange(rowNumber, 1, 1, headers.length).setValues([row]);
+  } else {
+    sheet.appendRow(row);
+  }
+  return {ok: true, sheetName, keyValue};
+};
+
+function verifyStaff_() {
+  const email = String(Session.getActiveUser().getEmail() || '').toLowerCase();
+  if (!email) throw new Error('Staff sign-in is required.');
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const allowed = getObjects_(ss, 'Staff Access').some((r) =>
+    String(r['Staff Email'] || '').toLowerCase() === email &&
+    String(r['Admin Access']).toUpperCase() === 'TRUE' &&
+    String(r['Active']).toUpperCase() === 'TRUE'
+  );
+  if (!allowed) throw new Error('This Google account is not authorized for the NYC FIRST staff dashboard.');
 }
