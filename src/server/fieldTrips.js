@@ -352,6 +352,122 @@ export const getStaffAdminData = () => {
   };
 };
 
+export const recordAttendance = (reservationId, payload) => {
+  verifyStaff_();
+  if (!reservationId) throw new Error('Reservation ID is required.');
+  payload = payload || {};
+
+  const actualStudents = Number(payload.actualStudents);
+  if (!Number.isFinite(actualStudents) || actualStudents < 0) {
+    throw new Error('Actual students must be a number of 0 or greater.');
+  }
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const reservations = ss.getSheetByName('Reservations');
+  const data = reservations.getDataRange().getValues();
+  const headers = data[0].map((h) => String(h || '').trim());
+  const idIndex = headers.indexOf('Reservation ID');
+  if (idIndex < 0) throw new Error('Reservation ID column is missing.');
+
+  let rowIndex = -1;
+  let row = null;
+  for (let i = 1; i < data.length; i += 1) {
+    if (String(data[i][idIndex]) === String(reservationId)) {
+      rowIndex = i;
+      row = data[i].slice();
+      break;
+    }
+  }
+  if (!row) throw new Error('Reservation not found: ' + reservationId);
+  if (String(row[headers.indexOf('Status')] || '').toUpperCase() === 'CANCELLED') {
+    throw new Error('Attendance cannot be entered for a cancelled reservation.');
+  }
+
+  const setReservation = (header, value) => {
+    const index = headers.indexOf(header);
+    if (index >= 0) row[index] = value;
+  };
+
+  setReservation('Actual Students', actualStudents);
+  if (payload.adults !== '' && payload.adults !== undefined && payload.adults !== null) {
+    const adults = Number(payload.adults);
+    if (!Number.isFinite(adults) || adults < 0) throw new Error('Adults / chaperones must be 0 or greater.');
+    setReservation('Adults / Chaperones', adults);
+  }
+  setReservation('Attendance Entered', 'YES');
+  setReservation('Status', 'COMPLETED');
+  reservations.getRange(rowIndex + 1, 1, 1, headers.length).setValues([row]);
+
+  const get = (header) => row[headers.indexOf(header)];
+  const attendanceSheet = ss.getSheetByName('Attendance');
+  const attendanceData = attendanceSheet.getDataRange().getValues();
+  const attendanceHeaders = attendanceData[0].map((h) => String(h || '').trim());
+  const attendanceIdIndex = attendanceHeaders.indexOf('Reservation ID');
+  let attendanceRowNumber = -1;
+  for (let i = 1; i < attendanceData.length; i += 1) {
+    if (String(attendanceData[i][attendanceIdIndex]) === String(reservationId)) {
+      attendanceRowNumber = i + 1;
+      break;
+    }
+  }
+
+  const completedBy = String(Session.getActiveUser().getEmail() || '');
+  const checkInTime = String(payload.checkInTime || '').trim() ||
+    Utilities.formatDate(new Date(), APP_TIMEZONE, 'h:mm a');
+  const attendanceValues = {
+    'Reservation ID': reservationId,
+    'School': String(get('School Name') || ''),
+    'Workshop': String(get('Workshop Title') || ''),
+    'Date': normalizeDate_(get('Date')),
+    'Expected Students': Number(get('Expected Students')) || 0,
+    'Actual Students': actualStudents,
+    'Adults / Chaperones': Number(get('Adults / Chaperones')) || 0,
+    'Check-in Time': checkInTime,
+    'Completed By': completedBy,
+    'Notes': String(payload.notes || ''),
+  };
+  const attendanceRow = attendanceHeaders.map((header) =>
+    Object.prototype.hasOwnProperty.call(attendanceValues, header) ? attendanceValues[header] : ''
+  );
+
+  if (attendanceRowNumber > 0) {
+    attendanceSheet.getRange(attendanceRowNumber, 1, 1, attendanceHeaders.length).setValues([attendanceRow]);
+  } else {
+    attendanceSheet.appendRow(attendanceRow);
+  }
+
+  return {
+    ok: true,
+    reservationId,
+    status: 'COMPLETED',
+    actualStudents,
+    adults: Number(get('Adults / Chaperones')) || 0,
+  };
+};
+
+export const markSchoolContacted = (contactEmail) => {
+  verifyStaff_();
+  const email = String(contactEmail || '').trim().toLowerCase();
+  if (!email) throw new Error('A contact email is required.');
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName('Outreach Contacts');
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0].map((h) => String(h || '').trim());
+  const emailIndex = headers.indexOf('Email');
+  const contactedIndex = headers.indexOf('Last Contacted');
+  if (emailIndex < 0 || contactedIndex < 0) throw new Error('Outreach contact columns are missing.');
+
+  for (let i = 1; i < data.length; i += 1) {
+    if (String(data[i][emailIndex] || '').trim().toLowerCase() === email) {
+      const today = Utilities.formatDate(new Date(), APP_TIMEZONE, 'yyyy-MM-dd');
+      sheet.getRange(i + 1, contactedIndex + 1).setValue(today);
+      return {ok: true, email: contactEmail, lastContacted: today};
+    }
+  }
+  throw new Error('Contact not found: ' + contactEmail);
+};
+
 export const geocodeD3Schools = () => {
   verifyStaff_();
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -726,6 +842,10 @@ function buildStaffAnalytics_(ss) {
       outreachStatus: String(contact['Outreach Status'] || school['Outreach Contact Status'] || ''),
       lastContacted: normalizeDate_(contact['Last Contacted']),
       contactNotes: String(contact['Notes'] || ''),
+      fieldTripContactName: '',
+      fieldTripContactEmail: '',
+      fieldTripContactPhone: '',
+      fieldTripContactDate: '',
       reservations: 0,
       confirmed: 0,
       cancelled: 0,
@@ -743,6 +863,7 @@ function buildStaffAnalytics_(ss) {
   let totalCompletedTrips = 0;
   let totalExpected = 0;
   let totalActual = 0;
+  let completedExpectedStudents = 0;
 
   reservations.forEach((reservation) => {
     const schoolId = String(reservation['School ID / DBN'] || '').trim();
@@ -755,6 +876,13 @@ function buildStaffAnalytics_(ss) {
     const actual = Number(reservation['Actual Students']) || Number(attendance['Actual Students']) || 0;
     const date = normalizeDate_(reservation['Date']);
     const activity = String(reservation['Workshop Title'] || '').trim();
+
+    if (status !== 'CANCELLED' && date && (!stat.fieldTripContactDate || date >= stat.fieldTripContactDate)) {
+      stat.fieldTripContactDate = date;
+      stat.fieldTripContactName = String(reservation['Contact Name'] || '');
+      stat.fieldTripContactEmail = String(reservation['Contact Email'] || '');
+      stat.fieldTripContactPhone = String(reservation['Contact Phone'] || '');
+    }
 
     if (status === 'CANCELLED') {
       stat.cancelled += 1;
@@ -778,6 +906,7 @@ function buildStaffAnalytics_(ss) {
       stat.actualStudents += actual;
       totalCompletedTrips += 1;
       totalActual += actual;
+      completedExpectedStudents += expected;
       if (date && (!stat.lastTrip || date > stat.lastTrip)) stat.lastTrip = date;
       if (date) {
         const month = date.slice(0, 7);
@@ -800,8 +929,16 @@ function buildStaffAnalytics_(ss) {
     .slice(0, 12);
 
   const followUp = schoolStats
-    .filter((s) => s.contactEmail || s.contactName || s.reservations > 0)
-    .sort((a, b) => (b.lastTrip || '').localeCompare(a.lastTrip || '') || b.actualStudents - a.actualStudents);
+    .map((s) => ({
+      ...s,
+      followUpName: s.fieldTripContactName || s.contactName,
+      followUpEmail: s.fieldTripContactEmail || s.contactEmail,
+      followUpPhone: s.fieldTripContactPhone || s.contactPhone,
+      followUpRole: s.fieldTripContactEmail ? 'Field Trip Contact' : s.contactRole,
+      followUpSource: s.fieldTripContactEmail ? 'Latest reservation' : (s.contactEmail ? 'Outreach database' : ''),
+    }))
+    .filter((s) => s.followUpEmail || s.followUpName || s.reservations > 0)
+    .sort((a, b) => (b.lastTrip || b.fieldTripContactDate || '').localeCompare(a.lastTrip || a.fieldTripContactDate || '') || b.actualStudents - a.actualStudents);
 
   return {
     totals: {
@@ -811,7 +948,9 @@ function buildStaffAnalytics_(ss) {
       cancelled: totalCancelled,
       completedTrips: totalCompletedTrips,
       expectedStudents: totalExpected,
+      completedExpectedStudents,
       actualStudents: totalActual,
+      attendanceRate: completedExpectedStudents > 0 ? Math.round((totalActual / completedExpectedStudents) * 1000) / 10 : 0,
     },
     schoolStats,
     topSchools,
