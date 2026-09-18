@@ -20,6 +20,8 @@
     table{border-collapse:collapse;width:100%;font-size:13px}th,td{border-bottom:1px solid var(--line);padding:10px;text-align:left;vertical-align:top}th{background:#f4f7fb;color:var(--tory);position:sticky;top:76px}
     .scroll{overflow:auto;max-height:64vh}.hidden{display:none}.notice{padding:11px 13px;border-radius:10px;margin:10px 0}.ok{background:#e8f7f2;color:#176855}.err{background:#fff0ee;color:#8f2d21}
     .formgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.full{grid-column:1/-1}.muted{color:var(--gray);font-size:13px;line-height:1.5}
+    .editbar{display:flex;gap:10px;flex-wrap:wrap;align-items:end}.editbar>div{min-width:180px;flex:1}.danger{background:var(--red);color:#fff}.pill{display:inline-block;padding:4px 8px;border-radius:999px;background:#eef4fb;color:var(--tory);font-weight:800;font-size:11px}
+    .modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;place-items:center;padding:20px;z-index:50}.modal.open{display:grid}.modalbox{background:#fff;border-radius:18px;max-width:780px;width:100%;max-height:90vh;overflow:auto;padding:22px}.modalhead{display:flex;justify-content:space-between;gap:10px;align-items:center}.close{border:0;background:#eef2f6;border-radius:50%;width:36px;height:36px;font-weight:900}
     @media(max-width:900px){.layout{grid-template-columns:1fr}aside{border-right:0;border-bottom:1px solid var(--line)}nav{display:flex;gap:6px;overflow:auto}.cards{grid-template-columns:repeat(2,1fr)}.formgrid{grid-template-columns:1fr}.full{grid-column:auto}}
   </style>
 </head>
@@ -45,6 +47,7 @@
       <section id="templates" class="view hidden"></section>
       <section id="campaigns" class="view hidden"></section>
       <section id="media" class="view hidden"></section>
+      <section id="equipment" class="view hidden"></section>
       <section id="risk" class="view hidden"></section>
       <section id="attendance" class="view hidden"></section>
       <section id="reservations" class="view hidden"></section>
@@ -57,7 +60,7 @@ const sections=[
   ['dashboard','Dashboard'],['reservations','Reservations'],['workshops','Activities'],
   ['availability','Calendar / Availability'],['contacts','D3 Schools & Teachers'],
   ['templates','Letters / Templates'],['campaigns','Communications / Campaigns'],
-  ['media','Images & Media'],['risk','Assumption of Risk'],['attendance','Attendance'],['settings','Settings']
+  ['media','Images & Media'],['equipment','Equipment & Machines'],['risk','Assumption of Risk'],['attendance','Attendance'],['settings','Settings']
 ];
 function esc(v){return String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[s]))}
 function initNav(){document.getElementById('nav').innerHTML=sections.map(([id,label],i=>i))}
@@ -65,9 +68,14 @@ function buildNav(){
   document.getElementById('nav').innerHTML=sections.map(([id,label],i)=>'<button class="'+(i===0?'active':'')+'" onclick="showView(\''+id+'\',this)">'+esc(label)+'</button>').join('');
 }
 function showView(id,btn){document.querySelectorAll('.view').forEach(x=>x.classList.add('hidden'));document.getElementById(id).classList.remove('hidden');document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));if(btn)btn.classList.add('active')}
-function table(title,rows,columns){
+function table(title,rows,columns,actionFn){
   const cols=columns||Object.keys(rows[0]||{});
-  return '<div class="panel"><h2>'+esc(title)+'</h2><div class="scroll"><table><thead><tr>'+cols.map(c=>'<th>'+esc(c)+'</th>').join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+cols.map(c=>'<td>'+esc(r[c])+'</td>').join('')+'</tr>').join('')+'</tbody></table></div></div>';
+  return '<div class="panel"><h2>'+esc(title)+'</h2><div class="scroll"><table><thead><tr>'+
+    cols.map(c=>'<th>'+esc(c)+'</th>').join('')+(actionFn?'<th>Actions</th>':'')+
+    '</tr></thead><tbody>'+rows.map((r,i)=>'<tr>'+
+      cols.map(c=>'<td>'+esc(r[c])+'</td>').join('')+
+      (actionFn?'<td>'+actionFn(r,i)+'</td>':'')+
+    '</tr>').join('')+'</tbody></table></div></div>';
 }
 function render(){
   const d=state.data;
@@ -76,22 +84,216 @@ function render(){
   document.getElementById('mWorkshops').textContent=d.workshops.length;
   document.getElementById('mOpenDates').textContent=d.availability.filter(x=>String(x.Status).toUpperCase()==='OPEN').length;
   document.getElementById('mContacts').textContent=d.contacts.length;
-  document.getElementById('reservations').innerHTML=table('Reservations',d.reservations,['Reservation ID','Status','School Name','Contact Name','Contact Email','Workshop Title','Date','Start Time','Expected Students','Actual Students','Risk Form Status','Staff Approval']);
-  document.getElementById('workshops').innerHTML=editorIntro('Activities','Manage public titles, descriptions, grade bands, capacity, media links, learning objectives, standards, and publication status.')+table('Activity Library',d.workshops,['Workshop ID','Public Title','Category','Description','Publication Status','Age / Grade Band','Duration','Capacity','Photo / Media','Video URL']);
-  document.getElementById('availability').innerHTML=editorIntro('Calendar / Availability','Control which dates and times appear as open on the public booking calendar. Confirmed reservations can also create Google Calendar events when automation is enabled.')+table('Availability',d.availability,['Date','Start Time','End Time','Status','Workshop Restrictions','Capacity / School Slots','Calendar Event ID']);
-  document.getElementById('contacts').innerHTML=editorIntro('D3 Schools & STEM Contacts','Maintain teachers, parent coordinators, STEM leads, email addresses, outreach status, and communication notes.')+table('Outreach Contacts',d.contacts,['School ID / DBN','School','Contact Name','Role','Email','Phone','Outreach Status','Last Contacted','Notes']);
-  document.getElementById('templates').innerHTML=editorIntro('Letters / Templates','Manage confirmation letters, invitation letters, monthly promotion emails, reminders, and other communication copy.')+table('Email & Letter Templates',d.templates,['Template ID','Template Name','Type','Subject','Body / Message','Active','Last Updated']);
-  document.getElementById('campaigns').innerHTML=editorIntro('Communications / Campaigns','Plan monthly promotions and targeted outreach to District 3 schools.')+table('Email Campaigns',d.campaigns,['Campaign ID','Campaign Name','Month','Audience','Subject','Template ID','Scheduled Date','Sent Date','Status','Recipients']);
-  document.getElementById('media').innerHTML=editorIntro('Images & Media','Attach activity photos, videos, captions, and public/private status for the public site.')+table('Media Library',d.media,['Media ID','Workshop ID','Title','Type','Drive File / URL','Alt Text / Caption','Public','Updated']);
-  document.getElementById('risk').innerHTML=editorIntro('Assumption of Risk','Track when risk-form links are sent, signed, received, stored, and verified.')+table('Risk Forms',d.riskForms,['Reservation ID','School','Field Trip Date','Participant / Form Reference','Guardian / Signer','Sent Date','Signed Date','Status','Drive File / Folder','Staff Verified']);
-  document.getElementById('attendance').innerHTML=editorIntro('Attendance','Record expected and actual student attendance after each field trip.')+table('Attendance',d.attendance,['Reservation ID','School','Workshop','Date','Expected Students','Actual Students','Adults / Chaperones','Completed By']);
-  document.getElementById('settings').innerHTML='<div class="panel"><h2>System Settings</h2><div class="scroll"><table><thead><tr><th>Setting</th><th>Value</th></tr></thead><tbody>'+Object.entries(d.settings).map(([k,v])=>'<tr><td><b>'+esc(k)+'</b></td><td>'+esc(v)+'</td></tr>').join('')+'</tbody></table></div></div>';
+
+  document.getElementById('reservations').innerHTML=
+    '<div class="panel"><h1>Reservations</h1><p class="muted">Approve requests, send reminders, and monitor confirmation/risk-form status.</p></div>'+
+    table('Reservation Queue',d.reservations,
+      ['Reservation ID','Status','School Name','Contact Name','Contact Email','Workshop Title','Date','Start Time','Expected Students','Actual Students','Risk Form Status','Staff Approval'],
+      r=>reservationActions(r));
+
+  document.getElementById('workshops').innerHTML=
+    editorIntro('Activities','Manage public titles, descriptions, grade bands, capacity, media links, learning objectives, standards, and publication status.')+
+    editorLauncher('Workshops','Workshop ID','Activity',[
+      ['Public Title','text'],['Internal / Official Title','text'],['Category','text'],['Description','textarea'],
+      ['Publication Status','select:Featured|Published|Activity Library|Draft|Archived'],['Age / Grade Band','text'],['Duration','text'],['Capacity','text'],
+      ['Learning Objectives','textarea'],['Academic Standards','textarea'],['Photo / Media','text'],['Video URL','text']
+    ],d.workshops)+
+    table('Activity Library',d.workshops,['Workshop ID','Public Title','Category','Publication Status','Age / Grade Band','Duration','Capacity','Photo / Media','Video URL'],
+      r=>'<button class="btn secondary" onclick="openEditor(\'Workshops\',\'Workshop ID\',\''+jsq(r['Workshop ID'])+'\')">Edit</button>');
+
+  document.getElementById('availability').innerHTML=
+    editorIntro('Calendar / Availability','Control which dates and times appear on the public booking calendar. Confirmed reservations can create Google Calendar events when automation is enabled.')+
+    editorLauncher('Availability','Date','Availability',[
+      ['Start Time','text'],['End Time','text'],['Status','select:OPEN|HOLD|BOOKED|CLOSED'],['Workshop Restrictions','text'],['Capacity / School Slots','text'],['Staff Notes','textarea']
+    ],d.availability)+
+    table('Availability',d.availability,['Date','Start Time','End Time','Status','Workshop Restrictions','Capacity / School Slots','Calendar Event ID','Staff Notes'],
+      r=>'<button class="btn secondary" onclick="openAvailabilityEditor('+Number(d.availability.indexOf(r))+')">Edit</button>');
+
+  document.getElementById('contacts').innerHTML=
+    editorIntro('D3 Schools & STEM Contacts','Maintain teachers, parent coordinators, STEM leads, email addresses, outreach status, and communication notes.')+
+    editorLauncher('Outreach Contacts','Email','School Contact',[
+      ['School ID / DBN','text'],['School','text'],['Contact Name','text'],['Role','text'],['Phone','text'],['Verified','text'],
+      ['Outreach Status','text'],['Last Contacted','text'],['Notes','textarea']
+    ],d.contacts)+
+    table('Outreach Contacts',d.contacts,['School ID / DBN','School','Contact Name','Role','Email','Phone','Outreach Status','Last Contacted','Notes'],
+      r=>'<button class="btn secondary" onclick="openEditor(\'Outreach Contacts\',\'Email\',\''+jsq(r.Email)+'\')">Edit</button>');
+
+  document.getElementById('templates').innerHTML=
+    editorIntro('Letters / Templates','Manage confirmation letters, invitation letters, monthly promotion emails, reminders, and other communication copy.')+
+    editorLauncher('Email Templates','Template ID','Letter / Email Template',[
+      ['Template Name','text'],['Type','text'],['Subject','text'],['Body / Message','textarea'],['Active','select:TRUE|FALSE'],['Last Updated','text']
+    ],d.templates)+
+    table('Email & Letter Templates',d.templates,['Template ID','Template Name','Type','Subject','Body / Message','Active','Last Updated'],
+      r=>'<button class="btn secondary" onclick="openEditor(\'Email Templates\',\'Template ID\',\''+jsq(r['Template ID'])+'\')">Edit</button>');
+
+  document.getElementById('campaigns').innerHTML=
+    editorIntro('Communications / Campaigns','Plan monthly promotions and targeted outreach to District 3 schools.')+
+    editorLauncher('Email Campaigns','Campaign ID','Campaign',[
+      ['Campaign Name','text'],['Month','text'],['Audience','text'],['Subject','text'],['Template ID','text'],['Scheduled Date','text'],['Sent Date','text'],
+      ['Status','text'],['Recipients','textarea'],['Notes','textarea']
+    ],d.campaigns)+
+    table('Email Campaigns',d.campaigns,['Campaign ID','Campaign Name','Month','Audience','Subject','Template ID','Scheduled Date','Sent Date','Status','Recipients'],
+      r=>'<button class="btn secondary" onclick="openEditor(\'Email Campaigns\',\'Campaign ID\',\''+jsq(r['Campaign ID'])+'\')">Edit</button>');
+
+  document.getElementById('media').innerHTML=
+    editorIntro('Images & Media','Attach activity photos, videos, captions, and public/private status for the public site.')+
+    editorLauncher('Media Library','Media ID','Media Item',[
+      ['Workshop ID','text'],['Title','text'],['Type','text'],['Drive File / URL','text'],['Alt Text / Caption','textarea'],['Public','select:TRUE|FALSE'],['Uploaded By','text'],['Updated','text']
+    ],d.media)+
+    table('Media Library',d.media,['Media ID','Workshop ID','Title','Type','Drive File / URL','Alt Text / Caption','Public','Updated'],
+      r=>'<button class="btn secondary" onclick="openEditor(\'Media Library\',\'Media ID\',\''+jsq(r['Media ID'])+'\')">Edit</button>');
+
+  document.getElementById('equipment').innerHTML=
+    editorIntro('Equipment & Machines','Control the equipment and software information shown on the Washington Heights STEM Center section of the public app.')+
+    editorLauncher('Equipment','Equipment / Software','Equipment',[
+      ['Category','text'],['Type / Use','text'],['Public Description','textarea'],['Source URL','text'],['Active','select:TRUE|FALSE']
+    ],d.equipment||[])+
+    table('Equipment',d.equipment||[],['Category','Equipment / Software','Type / Use','Public Description','Source URL','Active'],
+      r=>'<button class="btn secondary" onclick="openEditor(\'Equipment\',\'Equipment / Software\',\''+jsq(r['Equipment / Software'])+'\')">Edit</button>');
+
+  document.getElementById('risk').innerHTML=
+    editorIntro('Assumption of Risk','Track when risk-form links are sent, signed, received, stored, and verified.')+
+    table('Risk Forms',d.riskForms,['Reservation ID','School','Field Trip Date','Participant / Form Reference','Guardian / Signer','Sent Date','Signed Date','Status','Drive File / Folder','Staff Verified']);
+
+  document.getElementById('attendance').innerHTML=
+    editorIntro('Attendance','Record expected and actual student attendance after each field trip.')+
+    table('Attendance',d.attendance,['Reservation ID','School','Workshop','Date','Expected Students','Actual Students','Adults / Chaperones','Completed By']);
+
+  document.getElementById('settings').innerHTML=settingsEditor(d.settings);
 }
-function editorIntro(title,text){return '<div class="panel"><h1>'+esc(title)+'</h1><p class="muted">'+esc(text)+'</p><p class="muted"><b>Current phase:</b> live data view and backend editing functions are connected; dedicated add/edit forms will be layered onto this interface.</p></div>'}
-function load(){
-  buildNav();
-  google.script.run.withSuccessHandler(d=>{state.data=d;render();}).withFailureHandler(e=>{document.getElementById('notice').innerHTML='<div class="notice err">'+esc(e.message||e)+'</div>';}).getStaffAdminData();
+function reservationActions(r){
+  const id=jsq(r['Reservation ID']);
+  const status=String(r.Status||'').toUpperCase();
+  let out='<div class="toolbar">';
+  if(status!=='CONFIRMED'&&status!=='CANCELLED') out+='<button class="btn primary" onclick="approveReservationUI(\''+id+'\')">Approve</button>';
+  if(status==='CONFIRMED') out+='<button class="btn secondary" onclick="sendReminderUI(\''+id+'\')">Send reminder</button>';
+  out+='</div>';
+  return out;
 }
+function editorIntro(title,text){
+  return '<div class="panel"><h1>'+esc(title)+'</h1><p class="muted">'+esc(text)+'</p></div>';
+}
+function editorLauncher(sheet,key,label,fields,rows){
+  const id='cfg_'+Math.random().toString(36).slice(2);
+  window[id]={sheet,key,label,fields,rows};
+  return '<div class="panel"><div class="toolbar"><button class="btn primary" onclick="openNewEditor(\''+id+'\')">+ Add '+esc(label)+'</button></div></div>';
+}
+function jsq(v){return String(v??'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,' ')}
+function findRecord(sheet,key,keyValue){
+  const map={
+    'Workshops':'workshops','Availability':'availability','Outreach Contacts':'contacts','Email Campaigns':'campaigns',
+    'Email Templates':'templates','Media Library':'media','Risk Forms':'riskForms','Attendance':'attendance','Equipment':'equipment'
+  };
+  const rows=state.data[map[sheet]]||[];
+  return rows.find(r=>String(r[key])===String(keyValue))||null;
+}
+function fieldsForSheet(sheet){
+  const defs={
+    'Workshops':[['Public Title','text'],['Internal / Official Title','text'],['Category','text'],['Description','textarea'],['Publication Status','select:Featured|Published|Activity Library|Draft|Archived'],['Age / Grade Band','text'],['Duration','text'],['Capacity','text'],['Learning Objectives','textarea'],['Academic Standards','textarea'],['Photo / Media','text'],['Video URL','text']],
+    'Availability':[['Start Time','text'],['End Time','text'],['Status','select:OPEN|HOLD|BOOKED|CLOSED'],['Workshop Restrictions','text'],['Capacity / School Slots','text'],['Staff Notes','textarea']],
+    'Outreach Contacts':[['School ID / DBN','text'],['School','text'],['Contact Name','text'],['Role','text'],['Phone','text'],['Verified','text'],['Outreach Status','text'],['Last Contacted','text'],['Notes','textarea']],
+    'Email Templates':[['Template Name','text'],['Type','text'],['Subject','text'],['Body / Message','textarea'],['Active','select:TRUE|FALSE'],['Last Updated','text']],
+    'Email Campaigns':[['Campaign Name','text'],['Month','text'],['Audience','text'],['Subject','text'],['Template ID','text'],['Scheduled Date','text'],['Sent Date','text'],['Status','text'],['Recipients','textarea'],['Notes','textarea']],
+    'Media Library':[['Workshop ID','text'],['Title','text'],['Type','text'],['Drive File / URL','text'],['Alt Text / Caption','textarea'],['Public','select:TRUE|FALSE'],['Uploaded By','text'],['Updated','text']],
+    'Equipment':[['Category','text'],['Type / Use','text'],['Public Description','textarea'],['Source URL','text'],['Active','select:TRUE|FALSE']]
+  };
+  return defs[sheet]||[];
+}
+function openAvailabilityEditor(index){
+  const r=state.data.availability[index]; if(!r)return;
+  openRecordEditor('Availability','Date',String(r.Date),r,fieldsForSheet('Availability'));
+}
+function openEditor(sheet,key,keyValue){
+  const r=findRecord(sheet,key,keyValue); if(!r)return;
+  openRecordEditor(sheet,key,keyValue,r,fieldsForSheet(sheet));
+}
+function openNewEditor(cfgId){
+  const cfg=window[cfgId]; if(!cfg)return;
+  const keyValue=prompt('Enter the unique '+cfg.key+' for this new record:');
+  if(!keyValue)return;
+  const blank={}; blank[cfg.key]=keyValue;
+  openRecordEditor(cfg.sheet,cfg.key,keyValue,blank,cfg.fields);
+}
+function openRecordEditor(sheet,key,keyValue,record,fields){
+  const host=document.getElementById('editorModalBody');
+  host.dataset.sheet=sheet;host.dataset.key=key;host.dataset.keyValue=keyValue;
+  let html='<div class="formgrid"><div class="full"><label>'+esc(key)+'</label><input value="'+esc(keyValue)+'" disabled></div>';
+  fields.forEach(([name,type])=>{
+    const value=record[name]??'';
+    html+='<div class="'+(type==='textarea'?'full':'')+'"><label>'+esc(name)+'</label>'+inputFor(name,type,value)+'</div>';
+  });
+  html+='</div>';
+  host.innerHTML=html;
+  document.getElementById('editorTitle').textContent='Edit '+sheet;
+  document.getElementById('editorModal').classList.add('open');
+}
+function inputFor(name,type,value){
+  if(type==='textarea')return '<textarea data-field="'+esc(name)+'">'+esc(value)+'</textarea>';
+  if(type.startsWith('select:')){
+    const opts=type.slice(7).split('|');
+    return '<select data-field="'+esc(name)+'">'+opts.map(o=>'<option value="'+esc(o)+'" '+(String(value).toUpperCase()===o.toUpperCase()?'selected':'')+'>'+esc(o)+'</option>').join('')+'</select>';
+  }
+  return '<input data-field="'+esc(name)+'" value="'+esc(value)+'">';
+}
+function closeEditor(){document.getElementById('editorModal').classList.remove('open')}
+function saveEditor(){
+  const host=document.getElementById('editorModalBody');
+  const values={};host.querySelectorAll('[data-field]').forEach(el=>values[el.dataset.field]=el.value);
+  showNotice('Saving…','ok');
+  google.script.run.withSuccessHandler(()=>{closeEditor();showNotice('Saved.','ok');reloadData();})
+    .withFailureHandler(e=>showNotice(e.message||e,'err'))
+    .saveStaffRecord(host.dataset.sheet,host.dataset.key,host.dataset.keyValue,values);
+}
+function settingsEditor(settings){
+  const editable=[
+    'Risk Form URL','Enable Email Automations','Enable Calendar Automations','Calendar ID',
+    'Cost Contact Name','Cost Contact Email','Internal Booking Alert Emails','NYC FIRST Website','Member Card Submission URL'
+  ];
+  return '<div class="panel"><h1>System Settings</h1><p class="muted">Update the live links and automation switches used by the public app and backend.</p>'+
+    editable.map(k=>'<div class="editbar"><div><label>'+esc(k)+'</label><input id="setting_'+safeId(k)+'" value="'+esc(settings[k]??'')+'"></div><button class="btn primary" onclick="saveSettingUI(\''+jsq(k)+'\')">Save</button></div>').join('')+
+    '<div class="toolbar" style="margin-top:22px"><button class="btn secondary" onclick="installTriggersUI()">Install / Refresh Daily Reminder Trigger</button></div></div>'+
+    '<div class="panel"><h2>All Settings</h2><div class="scroll"><table><tbody>'+Object.entries(settings).map(([k,v])=>'<tr><td><b>'+esc(k)+'</b></td><td>'+esc(v)+'</td></tr>').join('')+'</tbody></table></div></div>';
+}
+function safeId(v){return String(v).replace(/[^a-z0-9]/gi,'_')}
+function saveSettingUI(name){
+  const value=document.getElementById('setting_'+safeId(name)).value;
+  showNotice('Saving setting…','ok');
+  google.script.run.withSuccessHandler(()=>{showNotice('Setting saved.','ok');reloadData();})
+    .withFailureHandler(e=>showNotice(e.message||e,'err')).saveSetting(name,value,'Updated from NYC FIRST Staff Admin');
+}
+function approveReservationUI(id){
+  if(!confirm('Approve '+id+'? This can send the school confirmation and create the calendar event when automations are enabled.'))return;
+  showNotice('Approving reservation…','ok');
+  google.script.run.withSuccessHandler(()=>{showNotice('Reservation confirmed.','ok');reloadData();})
+    .withFailureHandler(e=>showNotice(e.message||e,'err')).approveReservation(id);
+}
+function sendReminderUI(id){
+  if(!confirm('Send a reminder for '+id+' now?'))return;
+  showNotice('Sending reminder…','ok');
+  google.script.run.withSuccessHandler(()=>showNotice('Reminder sent.','ok'))
+    .withFailureHandler(e=>showNotice(e.message||e,'err')).sendReservationReminder(id);
+}
+function installTriggersUI(){
+  showNotice('Installing daily trigger…','ok');
+  google.script.run.withSuccessHandler(r=>showNotice(r.message||'Trigger installed.','ok'))
+    .withFailureHandler(e=>showNotice(e.message||e,'err')).installD3AutomationTriggers();
+}
+function showNotice(message,type){
+  document.getElementById('notice').innerHTML='<div class="notice '+(type==='err'?'err':'ok')+'">'+esc(message)+'</div>';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function reloadData(){
+  google.script.run.withSuccessHandler(d=>{state.data=d;render();})
+    .withFailureHandler(e=>showNotice(e.message||e,'err')).getStaffAdminData();
+}
+function load(){buildNav();reloadData();}
 window.addEventListener('load',load);
 </script>
+<div id="editorModal" class="modal">
+  <div class="modalbox">
+    <div class="modalhead"><h2 id="editorTitle">Edit</h2><button class="close" onclick="closeEditor()">×</button></div>
+    <div id="editorModalBody"></div>
+    <div class="toolbar"><button class="btn primary" onclick="saveEditor()">Save changes</button><button class="btn secondary" onclick="closeEditor()">Cancel</button></div>
+  </div>
+</div>
 </body></html>
