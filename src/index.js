@@ -5,6 +5,8 @@ import {
   getAppData,
   getAvailability,
   getDatabaseInfo,
+  getStaffAdminData,
+  saveStaffRecord,
   submitReservation,
 } from './server/fieldTrips.js';
 
@@ -14,7 +16,9 @@ export {
   getAppData,
   getAvailability,
   getDatabaseInfo,
+  getStaffAdminData,
   getGmailAliases,
   makeQueryString,
+  saveStaffRecord,
   submitReservation,
 };
