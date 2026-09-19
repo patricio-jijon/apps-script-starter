@@ -724,6 +724,54 @@ export const geocodeD3Schools = () => {
   return {ok: true, updated, remaining, failed};
 };
 
+export const saveAvailabilitySlot = (dateValue, originalStartTime, values) => {
+  verifyStaff_();
+  values = values || {};
+  const date = String(dateValue || '').trim();
+  const startTime = String(values['Start Time'] || originalStartTime || '').trim();
+  if (!date) throw new Error('Availability date is required.');
+  if (!startTime) throw new Error('Start Time is required.');
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName('Availability');
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0].map((h) => String(h || '').trim());
+  const dateIndex = headers.indexOf('Date');
+  const startIndex = headers.indexOf('Start Time');
+  if (dateIndex < 0 || startIndex < 0) throw new Error('Availability date/time columns are missing.');
+
+  let rowNumber = -1;
+  let existingRow = new Array(headers.length).fill('');
+  for (let i = 1; i < data.length; i += 1) {
+    const rowDate = normalizeDate_(data[i][dateIndex]);
+    const rowStart = String(data[i][startIndex] || '');
+    if (rowDate === date && rowStart === String(originalStartTime || startTime)) {
+      rowNumber = i + 1;
+      existingRow = data[i].slice();
+      break;
+    }
+  }
+
+  if (rowNumber < 0) {
+    const duplicate = data.slice(1).some((row) =>
+      normalizeDate_(row[dateIndex]) === date &&
+      String(row[startIndex] || '') === startTime
+    );
+    if (duplicate) throw new Error('That availability slot already exists.');
+  }
+
+  const row = headers.map((header, i) =>
+    Object.prototype.hasOwnProperty.call(values, header) ? values[header] : existingRow[i]
+  );
+  row[dateIndex] = date;
+  row[startIndex] = startTime;
+
+  if (rowNumber > 0) sheet.getRange(rowNumber, 1, 1, headers.length).setValues([row]);
+  else sheet.appendRow(row);
+
+  return {ok: true, date, startTime};
+};
+
 export const saveStaffRecord = (sheetName, keyHeader, keyValue, values) => {
   verifyStaff_();
   const allowed = {
