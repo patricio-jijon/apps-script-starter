@@ -1,0 +1,48 @@
+name: D3 Field Trips App CI
+
+on:
+  push:
+    branches:
+      - d3-field-trips-demo
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Apps Script bundle
+        run: npm run build
+
+      - name: Verify deployment files
+        run: |
+          test -f dist/gas/code.js
+          test -f dist/gas/index.html
+          test -f dist/gas/admin.html
+          test -f dist/gas/appsscript.json
+          grep -q "getStaffAdminData" dist/gas/code.js
+          grep -q "submitReservation" dist/gas/code.js
+          grep -q "D3 School Field Trips" dist/gas/index.html
+          grep -q "Staff Admin" dist/gas/admin.html
+
+      - name: Upload Apps Script build
+        uses: actions/upload-artifact@v4
+        with:
+          name: d3-field-trips-app-build
+          path: dist/gas
+          retention-days: 7
