@@ -264,7 +264,7 @@
         <div style="display:flex;gap:12px;flex-wrap:wrap">
           <a id="nycFirstFooterLink" href="https://www.nycfirst.org/" target="_blank" rel="noopener">NYC FIRST Website</a>
           <a id="memberCardFooterLink" href="https://dashboard.nycfirst.org/check-in/washington-heights" target="_blank" rel="noopener">Submit Member Card</a>
-          <a href="?view=staff">NYC FIRST Staff</a>
+          <a id="staffAdminFooterLink" class="hidden" href="#" target="_blank" rel="noopener">NYC FIRST Staff</a>
         </div>
       </div>
     </footer>
@@ -327,9 +327,15 @@
       ['stemCenterLink',links.stemCenterPage],
       ['memberCardLinkCenter',links.memberCard],
       ['nycFirstFooterLink',links.website],
-      ['memberCardFooterLink',links.memberCard]
+      ['memberCardFooterLink',links.memberCard],
+      ['staffAdminFooterLink',links.staffAdmin]
     ];
-    pairs.forEach(([id,url])=>{const el=document.getElementById(id);if(el&&url)el.href=url;});
+    pairs.forEach(([id,url])=>{
+      const el=document.getElementById(id);if(!el)return;
+      const valid=url&&url!=='TBD';
+      if(valid)el.href=url;
+      if(id==='staffAdminFooterLink')el.classList.toggle('hidden',!valid);
+    });
   }
 
   function renderEquipment(){
@@ -406,7 +412,7 @@
     document.getElementById('monthLabel').textContent=m.toLocaleDateString('en-US',{month:'long',year:'numeric'});
     const map=availabilityMap(), first=new Date(year,month,1), last=new Date(year,month+1,0);
     if(!Object.keys(map).length){
-      document.getElementById('calendar').innerHTML='<div class="full" style="grid-column:1/-1;padding:24px;text-align:center" class="sub">Official field-trip dates are being finalized. Please check back soon or contact NYC FIRST for scheduling information.</div>';
+      document.getElementById('calendar').innerHTML='<div class="full sub" style="grid-column:1/-1;padding:24px;text-align:center">Official field-trip dates are being finalized. Please check back soon or contact NYC FIRST for scheduling information.</div>';
       document.getElementById('times').innerHTML='';
       return;
     }
