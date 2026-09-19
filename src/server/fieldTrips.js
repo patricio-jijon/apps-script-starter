@@ -349,6 +349,55 @@ function createReservationId_(dateString) {
 }
 
 
+export const runD3SystemCheck = () => {
+  verifyStaff_();
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const requiredSheets = [
+    'Reservations','D3 Schools','Outreach Contacts','Workshops','Availability',
+    'Risk Forms','Email Campaigns','Email Templates','Media Library','Staff Access',
+    'Settings','Attendance','Equipment','Communication Log'
+  ];
+  const missingSheets = requiredSheets.filter((name) => !ss.getSheetByName(name));
+
+  const requiredHeaders = {
+    'Reservations': ['Reservation ID','Status','School ID / DBN','School Name','Contact Name','Contact Email','Workshop ID','Workshop Title','Date','Start Time','Risk Form Status','Staff Approval','Confirmation Sent','Reminder 1 Sent','Reminder 2 Sent','Attendance Entered'],
+    'Availability': ['Date','Start Time','End Time','Status','Calendar Event ID','Staff Notes'],
+    'Risk Forms': ['Reservation ID','School','Field Trip Date','Email','Status','Staff Verified'],
+    'Attendance': ['Reservation ID','School','Workshop','Date','Expected Students','Actual Students'],
+    'Communication Log': ['Timestamp','School ID / DBN','School','Contact Name','Contact Email','Type','Subject / Purpose','Reservation ID','Campaign ID','Staff Email','Notes'],
+  };
+  const headerProblems = [];
+  Object.keys(requiredHeaders).forEach((sheetName) => {
+    const sheet = ss.getSheetByName(sheetName);
+    if (!sheet) return;
+    const values = sheet.getRange(1,1,1,Math.max(1,sheet.getLastColumn())).getValues()[0];
+    const headers = values.map((h) => String(h || '').trim());
+    const missing = requiredHeaders[sheetName].filter((h) => !headers.includes(h));
+    if (missing.length) headerProblems.push({sheet: sheetName, missing});
+  });
+
+  const settings = getSettings_();
+  const readiness = buildLaunchReadiness_(ss);
+  const demoAvailability = getObjects_(ss,'Availability').filter((r) =>
+    String(r['Staff Notes'] || '').toUpperCase().includes('DEMO')
+  ).length;
+
+  return {
+    ok: missingSheets.length === 0 && headerProblems.length === 0,
+    spreadsheetId: ss.getId(),
+    spreadsheetName: ss.getName(),
+    missingSheets,
+    headerProblems,
+    launchReadiness: readiness,
+    demoAvailabilityRows: demoAvailability,
+    blockers: [
+      String(settings['Apps Script Project ID'] || '').trim() === 'TBD' ? 'Apps Script Project ID is not connected.' : '',
+      String(settings['Public App URL'] || '').trim() === 'TBD' ? 'Public App URL is not set.' : '',
+      String(settings['Staff Admin URL'] || '').trim() === 'TBD' ? 'Staff Admin URL is not set.' : '',
+    ].filter(Boolean),
+  };
+};
+
 export const getStaffAdminData = () => {
   verifyStaff_();
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
