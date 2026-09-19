@@ -195,10 +195,8 @@
               <div class="full"><label>Notes</label><textarea id="notes" placeholder="Transportation timing, curriculum connection, special requests…"></textarea></div>
             </div>
             <div class="risk">
-              <b>Demo assumption-of-risk acknowledgement</b>
-              <p>The official NYC FIRST Assumption of Risk form link will be included in confirmation and reminder communications. The final form URL is still pending and will be controlled from the staff settings.</p>
-              <label>Authorized signer name</label><input id="riskSigner">
-              <div class="check" style="margin-top:10px"><input id="riskAcknowledged" type="checkbox"><span>I acknowledge that the official assumption-of-risk / consent form will be required before participation.</span></div>
+              <b>Assumption of Risk form</b>
+              <p>If your field-trip request is approved, NYC FIRST staff will send the official Assumption of Risk form and completion instructions before the visit.</p>
             </div>
             <div class="costbox">Cost questions: <b>Katiuska Hernandez</b> · <a href="mailto:kat@nycfirst.org">kat@nycfirst.org</a></div>
             <div class="actions"><button class="secondary" onclick="setStep(3)">Back</button><button class="primary" id="submitBtn" onclick="submitBooking()">Submit reservation</button></div>
@@ -209,7 +207,7 @@
 
     <section id="schools">
       <div class="sectionhead">
-        <div><h2>District 3 school directory.</h2><p class="sub">Built as an outreach workspace. Public contact details are for communication planning; confirm the correct field-trip/STEM coordinator before outreach.</p></div>
+        <div><h2>District 3 school directory.</h2><p class="sub">Find your school and start a field-trip request.</p></div>
         <div id="schoolCount" class="pill"></div>
       </div>
       <div class="directory">
@@ -217,18 +215,13 @@
           <label>Search</label><input id="directorySearch" placeholder="School, DBN, neighborhood…" oninput="renderDirectory()">
           <label>School type</label>
           <select id="typeFilter" onchange="renderDirectory()"><option value="">All types</option><option>District - Zoned</option><option>District - Choice</option><option>Charter</option></select>
-          <label>Contact coverage</label>
-          <select id="contactFilter" onchange="renderDirectory()"><option value="">All schools</option><option value="yes">Public outreach contact found</option><option value="no">Contact research pending</option></select>
-          <p class="footnote">Demo directory assembled from current public NYCPS information and District 3 lists. You can replace it with your official list later.</p>
+          <p class="footnote">District 3 school directory used for NYC FIRST field-trip booking.</p>
         </div>
         <div id="directoryList" class="listpanel"></div>
       </div>
     </section>
 
-    <section id="contacts">
-      <div class="sectionhead"><div><h2>Outreach contacts.</h2><p class="sub">District leadership plus public school contacts already researched for the demo.</p></div></div>
-      <div class="listpanel" style="overflow:auto"><table class="contacttable"><thead><tr><th>School</th><th>Contact</th><th>Role</th><th>Email / phone</th></tr></thead><tbody id="contactsBody"></tbody></table></div>
-    </section>
+
 
 
     <section id="center">
@@ -258,7 +251,7 @@
         <div class="path"><h4>🔌 Physical Computing</h4><p>Circuits → sensors → actuators → Arduino-style logic → responsive prototypes.</p></div>
         <div class="path"><h4>🧪 Chemistry Engineering</h4><p>Matter → reactions → variables → measurement → process improvement and safe testing.</p></div>
         <div class="path"><h4>🎛 Sound Engineering</h4><p>Waves → frequency → electronics → speakers/microphones → sound effects and digital audio.</p></div>
-        <div class="path"><h4>📐 Standards Mapping</h4><p>Demo fields are ready for NYSP12SLS, NYS Computer Science & Digital Fluency, math, arts, and your official curriculum standards.</p></div>
+        <div class="path"><h4>📐 Standards Mapping</h4><p>Activities can be aligned with relevant New York State science, computer science, math, engineering, and arts learning standards.</p></div>
       </div>
     </section>
 
@@ -280,7 +273,7 @@
   <div id="workshopModal" class="modal" onclick="modalOutside(event)">
     <div class="modalbox">
       <div class="modalhead"><div><span id="modalIcon" style="font-size:44px"></span><h2 id="modalTitle" style="font-size:36px"></h2><p id="modalSubtitle" class="sub"></p></div><button class="close" onclick="closeModal()">×</button></div>
-      <div class="mediaDemo"><div class="fakevideo"><div><div style="font-size:48px">▶</div><b>Activity video placeholder</b><br><small>Replace with your real workshop video.</small></div></div><div id="modalPhoto" class="fakephoto">🤖</div></div>
+      <div id="modalMedia" class="mediaDemo hidden"></div>
       <p id="modalDescription" class="sub"></p>
       <h3>Students will…</h3><ul id="modalObjectives"></ul>
       <h3>Curriculum & standards</h3><ul id="modalStandards"></ul>
@@ -297,7 +290,7 @@
         state.data = data;
         const first = data.availability && data.availability[0] ? new Date(data.availability[0].date + 'T12:00:00') : new Date();
         state.calendarMonth = new Date(first.getFullYear(), first.getMonth(), 1);
-        renderWorkshops(); renderSchoolChoices(); renderDirectory(); renderContacts(); renderCalendar(); renderEquipment(); applyPublicLinks(); openSharedActivityFromHash();
+        renderWorkshops(); renderSchoolChoices(); renderDirectory(); renderCalendar(); renderEquipment(); applyPublicLinks(); openSharedActivityFromHash();
       })
       .withFailureHandler(err => showNotice(err.message || String(err), 'error'))
       .getAppData();
@@ -369,12 +362,17 @@
     const w = state.data.workshops.find(x=>x.id===id); if(!w)return;
     state.modalWorkshop=id;
     document.getElementById('modalIcon').textContent=w.icon;
-    document.getElementById('modalPhoto').textContent=w.icon;
     document.getElementById('modalTitle').textContent=w.title;
     document.getElementById('modalSubtitle').textContent=(w.category || w.subtitle || 'STEM Activity')+' · '+w.ages+' · '+w.duration;
     document.getElementById('modalDescription').textContent=w.description;
-    document.getElementById('modalObjectives').innerHTML=w.objectives.map(x=>'<li>'+esc(x)+'</li>').join('');
-    document.getElementById('modalStandards').innerHTML=w.standards.map(x=>'<li>'+esc(x)+'</li>').join('');
+    document.getElementById('modalObjectives').innerHTML=(w.objectives||[]).length?w.objectives.map(x=>'<li>'+esc(x)+'</li>').join(''):'<li>Learning objectives will be shared with the confirmed field-trip plan.</li>';
+    document.getElementById('modalStandards').innerHTML=(w.standards||[]).length?w.standards.map(x=>'<li>'+esc(x)+'</li>').join(''):'<li>Standards alignment will be finalized with the selected activity.</li>';
+    const media=document.getElementById('modalMedia');
+    const parts=[];
+    if(w.video)parts.push('<div class="fakevideo"><a href="'+esc(w.video)+'" target="_blank" rel="noopener" style="color:white;text-decoration:none"><div style="font-size:48px">▶</div><b>Watch activity video</b></a></div>');
+    if(w.photo)parts.push('<div class="fakephoto" style="padding:0;overflow:hidden"><img src="'+esc(w.photo)+'" alt="'+esc(w.title)+'" style="width:100%;height:100%;object-fit:cover"></div>');
+    media.innerHTML=parts.join('');
+    media.classList.toggle('hidden',parts.length===0);
     document.getElementById('workshopModal').classList.add('open');
   }
   function closeModal(){document.getElementById('workshopModal').classList.remove('open')}
@@ -407,6 +405,11 @@
     const m=state.calendarMonth, year=m.getFullYear(), month=m.getMonth();
     document.getElementById('monthLabel').textContent=m.toLocaleDateString('en-US',{month:'long',year:'numeric'});
     const map=availabilityMap(), first=new Date(year,month,1), last=new Date(year,month+1,0);
+    if(!Object.keys(map).length){
+      document.getElementById('calendar').innerHTML='<div class="full" style="grid-column:1/-1;padding:24px;text-align:center" class="sub">Official field-trip dates are being finalized. Please check back soon or contact NYC FIRST for scheduling information.</div>';
+      document.getElementById('times').innerHTML='';
+      return;
+    }
     let html=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(x=>'<div class="dow">'+x+'</div>').join('');
     for(let i=0;i<first.getDay();i++)html+='<div class="day blank"></div>';
     for(let d=1;d<=last.getDate();d++){
@@ -434,40 +437,32 @@
     const payload={
       schoolId:state.schoolId,workshopId:state.workshopId,date:state.date,time:state.time,
       contactName:val('contactName'),contactEmail:val('contactEmail'),contactPhone:val('contactPhone'),grades:val('grades'),
-      expectedStudents:val('expectedStudents'),adults:val('adults'),accessibility:val('accessibility'),notes:val('notes'),
-      riskSigner:val('riskSigner'),riskAcknowledged:document.getElementById('riskAcknowledged').checked
+      expectedStudents:val('expectedStudents'),adults:val('adults'),accessibility:val('accessibility'),notes:val('notes')
     };
     const btn=document.getElementById('submitBtn');btn.disabled=true;btn.textContent='Saving…';clearNotice();
     google.script.run.withSuccessHandler(result=>{
       btn.disabled=false;btn.textContent='Submit reservation';
       showNotice('Reservation '+result.reservationId+' saved. Status: '+result.status+'.', 'ok');
-      document.getElementById('bookingSummary').innerHTML=`<b>Reservation received ✓</b><p>ID: ${esc(result.reservationId)}</p><p>${esc(result.school)} · ${esc(result.workshop)} · ${esc(result.date)} · ${esc(result.time)}</p><p>Your request is recorded for NYC FIRST staff review. Booking notifications are configured for Patricio, Mariana, and Katiuska, and the school confirmation workflow can include the Assumption of Risk link.</p>`;
+      document.getElementById('bookingSummary').innerHTML=`<b>Reservation received ✓</b><p>ID: ${esc(result.reservationId)}</p><p>${esc(result.school)} · ${esc(result.workshop)} · ${esc(result.date)} · ${esc(result.time)}</p><p>Your request is recorded for NYC FIRST staff review. You will receive confirmation and Assumption of Risk instructions after the request is approved.</p>`;
     }).withFailureHandler(err=>{btn.disabled=false;btn.textContent='Submit reservation';showNotice(err.message||String(err),'error')}).submitReservation(payload);
   }
   function val(id){return document.getElementById(id).value.trim()}
   function showNotice(msg,type){const n=document.getElementById('bookingNotice');n.className='notice '+type;n.textContent=msg}
   function clearNotice(){const n=document.getElementById('bookingNotice');n.className='notice';n.textContent=''}
-
-  function contactsBySchool(){const m={};state.data.contacts.forEach(c=>{if(!m[c.schoolId])m[c.schoolId]=[];m[c.schoolId].push(c)});return m}
   function renderDirectory(){
     if(!state.data)return;
-    const q=(document.getElementById('directorySearch').value||'').toLowerCase(), type=document.getElementById('typeFilter').value, cf=document.getElementById('contactFilter').value, cmap=contactsBySchool();
+    const q=(document.getElementById('directorySearch').value||'').toLowerCase(), type=document.getElementById('typeFilter').value;
     const rows=state.data.schools.filter(s=>{
       const found=!q||[s.name,s.id,s.address,s.grades].join(' ').toLowerCase().includes(q);
-      const typed=!type||s.type===type; const has=Boolean(cmap[s.id]?.length); const contactOK=!cf||(cf==='yes'?has:!has);
-      return found&&typed&&contactOK;
+      const typed=!type||s.type===type;
+      return found&&typed;
     });
     document.getElementById('schoolCount').textContent=rows.length+' schools shown';
-    document.getElementById('directoryList').innerHTML=rows.map(s=>{
-      const c=(cmap[s.id]||[])[0];
-      return `<div class="schoolrow"><div><div class="dbn">${esc(s.id)} · ${esc(s.type)}</div><h4>${esc(s.name)}</h4><p>${esc(s.address)} · Grades ${esc(s.grades)}</p>${c?`<p style="margin-top:6px"><b>Outreach:</b> ${esc(c.name)} · ${esc(c.role)} · ${esc(c.email)}</p>`:'<p style="margin-top:6px"><b>Outreach:</b> contact research pending</p>'}</div><button class="secondary" onclick="chooseDirectorySchool('${s.id}')">Book</button></div>`;
-    }).join('')||'<p class="sub">No schools match these filters.</p>';
+    document.getElementById('directoryList').innerHTML=rows.map(s=>`
+      <div class="schoolrow"><div><div class="dbn">${esc(s.id)} · ${esc(s.type)}</div><h4>${esc(s.name)}</h4><p>${esc(s.address)} · Grades ${esc(s.grades)}</p></div><button class="secondary" onclick="chooseDirectorySchool('${s.id}')">Book</button></div>`
+    ).join('')||'<p class="sub">No schools match these filters.</p>';
   }
   function chooseDirectorySchool(id){state.schoolId=id;renderSchoolChoices();setStep(2);go('book')}
-  function renderContacts(){
-    const rows=state.data.contacts||[];
-    document.getElementById('contactsBody').innerHTML=rows.map(c=>`<tr><td><b>${esc(c.school)}</b></td><td>${esc(c.name)}</td><td>${esc(c.role)}</td><td><a href="mailto:${esc(c.email)}">${esc(c.email)}</a>${c.phone?'<br>'+esc(c.phone):''}</td></tr>`).join('');
-  }
   window.addEventListener('load',boot);
 </script>
 </body>
