@@ -362,6 +362,7 @@ function fieldsForSheet(sheet){
 function openAvailabilityEditor(index){
   const r=state.data.availability[index]; if(!r)return;
   openRecordEditor('Availability','Date',String(r.Date),r,fieldsForSheet('Availability'));
+  document.getElementById('editorModalBody').dataset.originalStart=String(r['Start Time']||'');
 }
 function openEditor(sheet,key,keyValue){
   const r=findRecord(sheet,key,keyValue); if(!r)return;
@@ -376,7 +377,7 @@ function openNewEditor(cfgId){
 }
 function openRecordEditor(sheet,key,keyValue,record,fields){
   const host=document.getElementById('editorModalBody');
-  host.dataset.sheet=sheet;host.dataset.key=key;host.dataset.keyValue=keyValue;
+  host.dataset.sheet=sheet;host.dataset.key=key;host.dataset.keyValue=keyValue;host.dataset.originalStart='';
   let html='<div class="formgrid"><div class="full"><label>'+esc(key)+'</label><input value="'+esc(keyValue)+'" disabled></div>';
   fields.forEach(([name,type])=>{
     const value=record[name]??'';
@@ -400,9 +401,13 @@ function saveEditor(){
   const host=document.getElementById('editorModalBody');
   const values={};host.querySelectorAll('[data-field]').forEach(el=>values[el.dataset.field]=el.value);
   showNotice('Saving…','ok');
-  google.script.run.withSuccessHandler(()=>{closeEditor();showNotice('Saved.','ok');reloadData();})
-    .withFailureHandler(e=>showNotice(e.message||e,'err'))
-    .saveStaffRecord(host.dataset.sheet,host.dataset.key,host.dataset.keyValue,values);
+  const runner=google.script.run.withSuccessHandler(()=>{closeEditor();showNotice('Saved.','ok');reloadData();})
+    .withFailureHandler(e=>showNotice(e.message||e,'err'));
+  if(host.dataset.sheet==='Availability'){
+    runner.saveAvailabilitySlot(host.dataset.keyValue,host.dataset.originalStart||'',values);
+  }else{
+    runner.saveStaffRecord(host.dataset.sheet,host.dataset.key,host.dataset.keyValue,values);
+  }
 }
 function settingsEditor(settings){
   const editable=[
