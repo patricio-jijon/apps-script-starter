@@ -416,7 +416,7 @@ function settingsEditor(settings){
   ];
   return '<div class="panel"><h1>System Settings</h1><p class="muted">Update the live links and automation switches used by the public app and backend.</p>'+
     editable.map(k=>'<div class="editbar"><div><label>'+esc(k)+'</label><input id="setting_'+safeId(k)+'" value="'+esc(settings[k]??'')+'"></div><button class="btn primary" onclick="saveSettingUI(\''+jsq(k)+'\')">Save</button></div>').join('')+
-    '<div class="toolbar" style="margin-top:22px"><button class="btn secondary" onclick="installTriggersUI()">Install / Refresh Daily Reminder Trigger</button></div></div>'+
+    '<div class="toolbar" style="margin-top:22px"><button class="btn secondary" onclick="installTriggersUI()">Install / Refresh Daily Reminder Trigger</button><button class="btn secondary" onclick="runSystemCheckUI()">Run System Check</button></div></div>'+
     '<div class="panel"><h2>All Settings</h2><div class="scroll"><table><tbody>'+Object.entries(settings).map(([k,v])=>'<tr><td><b>'+esc(k)+'</b></td><td>'+esc(v)+'</td></tr>').join('')+'</tbody></table></div></div>';
 }
 function safeId(v){return String(v).replace(/[^a-z0-9]/gi,'_')}
@@ -464,6 +464,18 @@ function cancelReservationUI(id){
   showNotice('Cancelling reservation…','ok');
   google.script.run.withSuccessHandler(()=>{showNotice('Reservation cancelled and slot reopened.','ok');reloadData();})
     .withFailureHandler(e=>showNotice(e.message||e,'err')).cancelReservation(id);
+}
+function runSystemCheckUI(){
+  showNotice('Running system check…','ok');
+  google.script.run.withSuccessHandler(r=>{
+    const problems=[];
+    if((r.missingSheets||[]).length)problems.push('Missing sheets: '+r.missingSheets.join(', '));
+    (r.headerProblems||[]).forEach(x=>problems.push(x.sheet+' missing: '+x.missing.join(', ')));
+    (r.blockers||[]).forEach(x=>problems.push(x));
+    if(r.demoAvailabilityRows)problems.push(r.demoAvailabilityRows+' demo availability row(s) remain hidden from the public app.');
+    const msg=problems.length?'System check completed. '+problems.join(' | '):'System check passed. Core sheet structure is ready.';
+    showNotice(msg,problems.length?'err':'ok');
+  }).withFailureHandler(e=>showNotice(e.message||e,'err')).runD3SystemCheck();
 }
 function installTriggersUI(){
   showNotice('Installing daily trigger…','ok');
