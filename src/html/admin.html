@@ -407,7 +407,7 @@ function saveEditor(){
 function settingsEditor(settings){
   const editable=[
     'Risk Form URL','Enable Email Automations','Enable Calendar Automations','Calendar ID',
-    'Cost Contact Name','Cost Contact Email','Internal Booking Alert Emails','NYC FIRST Website','Member Card Submission URL'
+    'Cost Contact Name','Cost Contact Email','Internal Booking Alert Emails','NYC FIRST Website','Member Card Submission URL','Staff Admin URL'
   ];
   return '<div class="panel"><h1>System Settings</h1><p class="muted">Update the live links and automation switches used by the public app and backend.</p>'+
     editable.map(k=>'<div class="editbar"><div><label>'+esc(k)+'</label><input id="setting_'+safeId(k)+'" value="'+esc(settings[k]??'')+'"></div><button class="btn primary" onclick="saveSettingUI(\''+jsq(k)+'\')">Save</button></div>').join('')+
