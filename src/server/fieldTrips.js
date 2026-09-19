@@ -65,6 +65,7 @@ export const getAppData = () => {
       website: String(settings['NYC FIRST Website'] || 'https://www.nycfirst.org/'),
       memberCard: String(settings['Member Card Submission URL'] || 'https://dashboard.nycfirst.org/check-in/washington-heights'),
       stemCenterPage: 'https://www.nycfirst.org/stem-center-locations/wh',
+      staffAdmin: String(settings['Staff Admin URL'] || ''),
       riskForm: String(settings['Risk Form URL'] || ''),
     },
     demo: false,
