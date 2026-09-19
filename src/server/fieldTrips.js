@@ -14,17 +14,6 @@ export const getAppData = () => {
     active: String(r['Active']).toLowerCase() !== 'false',
   })).filter((r) => r.name && r.active);
 
-  const contacts = getObjects_(ss, 'Outreach Contacts').map((r) => ({
-    schoolId: r['School ID / DBN'] || '',
-    school: r['School'] || '',
-    name: r['Contact Name'] || '',
-    role: r['Role'] || '',
-    email: r['Email'] || '',
-    phone: r['Phone'] || '',
-    verified: r['Verified'] || '',
-    outreachStatus: r['Outreach Status'] || '',
-  })).filter((r) => r.school || r.name);
-
   const workshops = getObjects_(ss, 'Workshops').map((r) => ({
     id: r['Workshop ID'] || '',
     title: r['Public Title'] || r['Internal / Official Title'] || '',
@@ -54,7 +43,6 @@ export const getAppData = () => {
 
   return {
     schools,
-    contacts,
     workshops,
     equipment,
     availability: getAvailability_(),
@@ -91,10 +79,6 @@ export const submitReservation = (payload) => {
   if (!payload.contactName || !payload.contactEmail) {
     throw new Error('Please enter a contact name and email.');
   }
-  if (!payload.riskAcknowledged || !payload.riskSigner) {
-    throw new Error('Please complete the risk-form acknowledgement.');
-  }
-
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const schools = getObjects_(ss, 'D3 Schools');
   const workshops = getObjects_(ss, 'Workshops');
@@ -160,7 +144,10 @@ export const getDatabaseInfo = () => {
 
 function getAvailability_() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const rows = getObjects_(ss, 'Availability').filter((r) => String(r['Status']).toUpperCase() === 'OPEN');
+  const rows = getObjects_(ss, 'Availability').filter((r) =>
+    String(r['Status']).toUpperCase() === 'OPEN' &&
+    !String(r['Staff Notes'] || '').toUpperCase().includes('DEMO')
+  );
   const grouped = {};
   rows.forEach((r) => {
     const date = normalizeDate_(r['Date']);
