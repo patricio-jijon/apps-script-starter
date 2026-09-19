@@ -21,6 +21,7 @@ import {
   sendReservationReminder,
   installD3AutomationTriggers,
   runD3DailyAutomation,
+  runD3SystemCheck,
   submitReservation,
 } from './server/fieldTrips.js';
 
@@ -42,6 +43,7 @@ export {
   installD3AutomationTriggers,
   makeQueryString,
   runD3DailyAutomation,
+  runD3SystemCheck,
   saveSetting,
   saveAvailabilitySlot,
   saveStaffRecord,
